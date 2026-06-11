@@ -1,0 +1,12 @@
+{
+  "Author": "Tuconei",
+  "Name": "ShotTracker",
+  "Punchline": "Track venue gamba shots, rolls, payouts, and nightly cuts.",
+  "Description": "Records participant trades, listens for the active player's /random rolls, applies configurable win and reroll rules, and maintains a persistent jackpot and nightly ledger. Open with /shottracker.",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "venue",
+    "rolls",
+    "ledger"
+  ]
+}
