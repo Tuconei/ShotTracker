@@ -14,6 +14,7 @@ public sealed class SessionManager
     }
 
     public NightSession? ActiveSession => configuration.ActiveSession;
+    public PendingTrade? PendingTrade => configuration.PendingTrade;
 
     public PlayerRound? ActiveRound
     {
@@ -37,39 +38,79 @@ public sealed class SessionManager
             StartingJackpot = configuration.JackpotBalance,
             EndingJackpot = configuration.JackpotBalance,
         };
+        configuration.PendingTrade = null;
         configuration.Save();
         return OperationResult.Ok("Night started.");
     }
 
-    public OperationResult RecordTrade(string playerName, long amount)
+    public OperationResult ArmTradeVerification(string playerName, long amount)
     {
-        var session = ActiveSession;
-        if (session == null)
-            return OperationResult.Fail("Start the night before recording a trade.");
+        var validation = ValidateTrade(playerName, amount);
+        if (!validation.Success)
+            return validation;
 
-        playerName = playerName.Trim();
-        if (playerName.Length == 0)
-            return OperationResult.Fail("Enter the participating player's name.");
-
-        if (configuration.ShotPrice <= 0)
-            return OperationResult.Fail("Shot price must be greater than zero.");
-
-        if (amount <= 0 || amount % configuration.ShotPrice != 0)
-            return OperationResult.Fail($"Trade must be a positive multiple of {configuration.ShotPrice:N0} gil.");
-
-        var splitTotal = configuration.JackpotPercent +
-                         configuration.HousePercent +
-                         configuration.DealerPercent;
-        if (!float.IsFinite(splitTotal) || splitTotal > 100)
-            return OperationResult.Fail("House, dealer, and jackpot percentages cannot total more than 100%.");
-
-        var activeRound = ActiveRound;
-        if (activeRound != null &&
-            !string.Equals(activeRound.PlayerName, playerName, StringComparison.OrdinalIgnoreCase))
+        configuration.PendingTrade = new PendingTrade
         {
-            return OperationResult.Fail($"Finish {activeRound.PlayerName}'s round before starting another player.");
+            PlayerName = playerName.Trim(),
+            ExpectedAmount = amount,
+        };
+        configuration.Save();
+        return OperationResult.Ok(
+            $"Waiting for {playerName.Trim()} to trade exactly {amount:N0} gil.");
+    }
+
+    public OperationResult CancelTradeVerification()
+    {
+        if (configuration.PendingTrade == null)
+            return OperationResult.Fail("There is no pending trade.");
+
+        configuration.PendingTrade = null;
+        configuration.Save();
+        return OperationResult.Ok("Pending trade verification canceled.");
+    }
+
+    public OperationResult ConfirmIncomingTrade(string playerName, long amount)
+    {
+        var pending = configuration.PendingTrade;
+        if (pending == null)
+            return OperationResult.Fail("No trade verification is armed.");
+
+        pending.LastObservedPlayer = playerName.Trim();
+        pending.LastObservedAmount = amount;
+
+        if (!NamesMatch(pending.PlayerName, playerName))
+        {
+            configuration.Save();
+            return OperationResult.Fail(
+                $"Ignored {amount:N0} gil from {playerName}; waiting for {pending.PlayerName}.");
         }
 
+        if (amount != pending.ExpectedAmount)
+        {
+            configuration.Save();
+            return OperationResult.Fail(
+                $"{playerName} traded {amount:N0} gil; expected exactly {pending.ExpectedAmount:N0}.");
+        }
+
+        var result = RecordTrade(pending.PlayerName, amount, true);
+        if (!result.Success)
+            return result;
+
+        configuration.PendingTrade = null;
+        configuration.Save();
+        return OperationResult.Ok(
+            $"Verified {amount:N0} gil from {pending.PlayerName} and credited the rolls.");
+    }
+
+    public OperationResult RecordTrade(string playerName, long amount, bool wasVerified = false)
+    {
+        var validation = ValidateTrade(playerName, amount);
+        if (!validation.Success)
+            return validation;
+
+        var session = ActiveSession!;
+        playerName = playerName.Trim();
+        var activeRound = ActiveRound;
         if (activeRound == null)
         {
             activeRound = new PlayerRound { PlayerName = playerName };
@@ -105,11 +146,24 @@ public sealed class SessionManager
             HouseCut = house,
             DealerCut = dealer,
             UnallocatedReserve = reserve,
+            WasVerified = wasVerified,
         });
 
         configuration.Save();
         return OperationResult.Ok(
             $"Recorded {amount:N0} gil from {activeRound.PlayerName}: {rolls} roll(s).");
+    }
+
+    public OperationResult RecordTradeManually(string playerName, long amount)
+    {
+        var result = RecordTrade(playerName, amount);
+        if (!result.Success)
+            return result;
+
+        configuration.PendingTrade = null;
+        configuration.Save();
+        return OperationResult.Ok(
+            $"Manually recorded {amount:N0} gil from {playerName.Trim()}.");
     }
 
     public OperationResult RecordRoll(string sender, int value, bool wasManual = false)
@@ -206,6 +260,7 @@ public sealed class SessionManager
         if (ActiveRound != null)
             FinishActiveRoundInternal();
 
+        configuration.PendingTrade = null;
         session.EndedAt = DateTimeOffset.Now;
         session.EndingJackpot = configuration.JackpotBalance;
         configuration.SessionHistory.Insert(0, session);
@@ -233,7 +288,35 @@ public sealed class SessionManager
         return (long)Math.Floor(amount * (decimal)percent / 100m);
     }
 
-    private static bool NamesMatch(string expected, string actual)
+    private OperationResult ValidateTrade(string playerName, long amount)
+    {
+        if (ActiveSession == null)
+            return OperationResult.Fail("Start the night before recording a trade.");
+
+        playerName = playerName.Trim();
+        if (playerName.Length == 0)
+            return OperationResult.Fail("Enter the participating player's name.");
+
+        if (configuration.ShotPrice <= 0)
+            return OperationResult.Fail("Shot price must be greater than zero.");
+
+        if (amount <= 0 || amount % configuration.ShotPrice != 0)
+            return OperationResult.Fail($"Trade must be a positive multiple of {configuration.ShotPrice:N0} gil.");
+
+        var splitTotal = configuration.JackpotPercent +
+                         configuration.HousePercent +
+                         configuration.DealerPercent;
+        if (!float.IsFinite(splitTotal) || splitTotal > 100)
+            return OperationResult.Fail("House, dealer, and jackpot percentages cannot total more than 100%.");
+
+        var activeRound = ActiveRound;
+        if (activeRound != null && !NamesMatch(activeRound.PlayerName, playerName))
+            return OperationResult.Fail($"Finish {activeRound.PlayerName}'s round before starting another player.");
+
+        return OperationResult.Ok("Trade is valid.");
+    }
+
+    internal static bool NamesMatch(string expected, string actual)
     {
         static string Normalize(string value)
         {

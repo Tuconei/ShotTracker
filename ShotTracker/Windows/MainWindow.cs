@@ -106,6 +106,36 @@ public sealed class MainWindow : Window, IDisposable
 
     private void DrawPlayerControls()
     {
+        var pendingTrade = plugin.Sessions.PendingTrade;
+        if (pendingTrade != null)
+        {
+            ImGui.TextColored(
+                new Vector4(1f, 0.78f, 0.25f, 1f),
+                $"Waiting for {pendingTrade.PlayerName} to trade {pendingTrade.ExpectedAmount:N0} gil");
+            ImGui.TextDisabled(
+                "Rolls will be credited only after a matching incoming trade system message is detected.");
+
+            if (pendingTrade.LastObservedAmount is { } observedAmount)
+            {
+                ImGui.TextColored(
+                    new Vector4(1f, 0.45f, 0.35f, 1f),
+                    $"Last unmatched trade: {pendingTrade.LastObservedPlayer}, {observedAmount:N0} gil");
+            }
+
+            if (ImGui.Button("Cancel Verification"))
+                Apply(plugin.Sessions.CancelTradeVerification());
+
+            ImGui.SameLine();
+            if (ImGui.Button("Record Expected Amount Manually"))
+            {
+                Apply(plugin.Sessions.RecordTradeManually(
+                    pendingTrade.PlayerName,
+                    pendingTrade.ExpectedAmount));
+            }
+
+            return;
+        }
+
         var round = plugin.Sessions.ActiveRound;
         if (round == null)
         {
@@ -122,8 +152,12 @@ public sealed class MainWindow : Window, IDisposable
                 $"{previewRolls} roll(s) at {plugin.Configuration.ShotPrice:N0} gil each. " +
                 "The amount must be an exact multiple.");
 
-            if (ImGui.Button("Accept Trade"))
-                Apply(plugin.Sessions.RecordTrade(participantName, tradeAmount));
+            if (ImGui.Button("Wait for Matching Trade"))
+                Apply(plugin.Sessions.ArmTradeVerification(participantName, tradeAmount));
+
+            ImGui.SameLine();
+            if (ImGui.Button("Record Manually"))
+                Apply(plugin.Sessions.RecordTradeManually(participantName, tradeAmount));
 
             return;
         }
@@ -137,8 +171,12 @@ public sealed class MainWindow : Window, IDisposable
         participantName = round.PlayerName;
         ImGui.SetNextItemWidth(180);
         ImGui.InputInt("Additional traded gil", ref tradeAmount, plugin.Configuration.ShotPrice);
-        if (ImGui.Button("Add Trade"))
-            Apply(plugin.Sessions.RecordTrade(round.PlayerName, tradeAmount));
+        if (ImGui.Button("Wait for Additional Trade"))
+            Apply(plugin.Sessions.ArmTradeVerification(round.PlayerName, tradeAmount));
+
+        ImGui.SameLine();
+        if (ImGui.Button("Add Manually"))
+            Apply(plugin.Sessions.RecordTradeManually(round.PlayerName, tradeAmount));
 
         ImGui.SameLine();
         if (ImGui.Button("End Player"))
@@ -211,7 +249,7 @@ public sealed class MainWindow : Window, IDisposable
 
         if (!ImGui.BeginTable(
                 "SalesTable",
-                6,
+                7,
                 ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchProp))
         {
             return;
@@ -223,6 +261,7 @@ public sealed class MainWindow : Window, IDisposable
         ImGui.TableSetupColumn("Jackpot");
         ImGui.TableSetupColumn("House");
         ImGui.TableSetupColumn("Dealer");
+        ImGui.TableSetupColumn("Verified");
         ImGui.TableHeadersRow();
 
         foreach (var sale in session.Sales.AsEnumerable().Reverse())
@@ -240,6 +279,12 @@ public sealed class MainWindow : Window, IDisposable
             ImGui.Text($"{sale.HouseCut:N0}");
             ImGui.TableNextColumn();
             ImGui.Text($"{sale.DealerCut:N0}");
+            ImGui.TableNextColumn();
+            ImGui.TextColored(
+                sale.WasVerified
+                    ? new Vector4(0.45f, 0.9f, 0.55f, 1f)
+                    : new Vector4(1f, 0.78f, 0.25f, 1f),
+                sale.WasVerified ? "Chat" : "Manual");
         }
 
         ImGui.EndTable();

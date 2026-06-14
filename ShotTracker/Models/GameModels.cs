@@ -43,6 +43,16 @@ public sealed class NightSession
 }
 
 [Serializable]
+public sealed class PendingTrade
+{
+    public string PlayerName { get; set; } = string.Empty;
+    public long ExpectedAmount { get; set; }
+    public DateTimeOffset ArmedAt { get; set; } = DateTimeOffset.Now;
+    public string LastObservedPlayer { get; set; } = string.Empty;
+    public long? LastObservedAmount { get; set; }
+}
+
+[Serializable]
 public sealed class PlayerRound
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -68,6 +78,7 @@ public sealed class SaleRecord
     public long HouseCut { get; set; }
     public long DealerCut { get; set; }
     public long UnallocatedReserve { get; set; }
+    public bool WasVerified { get; set; }
 }
 
 [Serializable]
