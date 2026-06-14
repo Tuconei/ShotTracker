@@ -1,29 +1,26 @@
-# v0.1.0 - Initial Development Release
+# v0.1.1 - Trade Verification
 
-ShotTracker's first development release establishes the complete venue game
-workflow and persistent accounting foundation.
+ShotTracker now verifies incoming gil payments through FFXIV's trade system
+message before granting purchased rolls.
 
-## Included
+## Added
 
-- Record player gil trades and convert them into purchased rolls.
-- Capture `/random` results only for the active participant.
-- Configure multiple winning numbers, fixed payouts, jackpot-percentage
-  payouts, and rerolls.
-- Maintain a growing jackpot with configurable jackpot, house, and dealer
-  splits.
-- Track roll counters, outcomes, payouts, sales, and nightly totals.
-- Persist active sessions, jackpot balance, settings, and prior night history.
-- Manually enter rolls for testing or corrections.
-- Package a Dalamud-ready release ZIP.
+- Arm an expected participant and exact gil amount before accepting payment.
+- Credit rolls only after a matching incoming trade system message.
+- Reject and display trades with the wrong player or amount.
+- Mark ledger sales as chat-verified or manually entered.
+- Keep an explicit manual fallback for unsupported client languages or
+  corrections.
 
 ## Validation
 
 - Debug and Release builds pass against Dalamud SDK 15.
-- The accounting regression harness covers invalid splits, participant
-  filtering, rerolls, overlapping payouts, jackpot caps, and night closeout.
+- The accounting regression harness covers exact payment matching, wrong
+  players, wrong amounts, comma-formatted gil, manual fallback, invalid splits,
+  rerolls, jackpot caps, and night closeout.
 
-## Development Status
+## Current Limitation
 
-This is an early development release. The core accounting behavior is tested,
-but the plugin still needs an in-game smoke test for live trade entry,
-localized `/random` payloads, and operator UI flow.
+Trade-message verification currently recognizes the English client message
+format. Other client languages can use the manual fallback until localized
+parsers are added.

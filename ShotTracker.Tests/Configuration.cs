@@ -12,6 +12,7 @@ public sealed class Configuration
     public long JackpotBalance { get; set; }
     public List<WinRule> WinRules { get; set; } = [];
     public NightSession? ActiveSession { get; set; }
+    public PendingTrade? PendingTrade { get; set; }
     public List<NightSession> SessionHistory { get; set; } = [];
 
     public void Save()

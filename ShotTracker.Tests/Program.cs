@@ -3,6 +3,7 @@ using ShotTracker.Models;
 using ShotTracker.Services;
 
 RunInvalidSplitTest();
+RunTradeVerificationTest();
 RunNightLifecycleTest();
 Console.WriteLine("All ShotTracker accounting tests passed.");
 
@@ -19,6 +20,61 @@ static void RunInvalidSplitTest()
     Assert(!manager.RecordTrade("Test Player", 100).Success, "Invalid split should fail.");
     Assert(configuration.ActiveSession!.Rounds.Count == 0, "Failed trade must not create a round.");
     Assert(configuration.ActiveSession.TotalIntake == 0, "Failed trade must not alter intake.");
+}
+
+static void RunTradeVerificationTest()
+{
+    Assert(
+        TradeMessageParser.TryParseIncoming(
+            "Test Player trades you 100,000 Gil.",
+            out var parsedPlayer,
+            out var parsedAmount),
+        "Incoming trade message should parse.");
+    Assert(parsedPlayer == "Test Player", "Trade parser should preserve the player name.");
+    Assert(parsedAmount == 100_000, "Trade parser should parse comma-formatted gil.");
+
+    var configuration = new Configuration
+    {
+        ShotPrice = 100_000,
+    };
+    var manager = new SessionManager(configuration);
+    Assert(manager.StartNight().Success, "Night should start.");
+    Assert(
+        manager.ArmTradeVerification("Test Player", 200_000).Success,
+        "Valid expected trade should arm.");
+    Assert(manager.ActiveRound == null, "Arming a trade must not grant rolls.");
+
+    Assert(
+        !manager.ConfirmIncomingTrade("Other Player", 200_000).Success,
+        "Wrong player should not verify.");
+    Assert(manager.ActiveRound == null, "Wrong player must not grant rolls.");
+    Assert(configuration.PendingTrade != null, "Wrong player should leave verification armed.");
+
+    Assert(
+        !manager.ConfirmIncomingTrade("Test Player", 100_000).Success,
+        "Wrong amount should not verify.");
+    Assert(manager.ActiveRound == null, "Wrong amount must not grant rolls.");
+    Assert(configuration.PendingTrade!.LastObservedAmount == 100_000, "Mismatch should be visible.");
+
+    Assert(
+        manager.ConfirmIncomingTrade("Test Player@Example", 200_000).Success,
+        "Matching cross-world player and amount should verify.");
+    Assert(configuration.PendingTrade == null, "Successful verification should clear pending state.");
+    Assert(manager.ActiveRound!.RemainingRolls == 2, "Verified trade should grant purchased rolls.");
+    Assert(
+        configuration.ActiveSession!.Sales.Single().WasVerified,
+        "Verified sale should be marked in the ledger.");
+
+    Assert(
+        manager.ArmTradeVerification("Test Player", 100_000).Success,
+        "Additional expected trade should arm.");
+    Assert(
+        manager.RecordTradeManually("Test Player", 100_000).Success,
+        "Manual override should record the trade.");
+    Assert(configuration.PendingTrade == null, "Manual override should clear pending verification.");
+    Assert(
+        !configuration.ActiveSession.Sales.Last().WasVerified,
+        "Manual override should remain visibly unverified.");
 }
 
 static void RunNightLifecycleTest()

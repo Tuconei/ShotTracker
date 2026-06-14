@@ -9,5 +9,6 @@
   <ItemGroup>
     <Compile Include="..\ShotTracker\Models\GameModels.cs" Link="Models\GameModels.cs" />
     <Compile Include="..\ShotTracker\Services\SessionManager.cs" Link="Services\SessionManager.cs" />
+    <Compile Include="..\ShotTracker\Services\TradeMessageParser.cs" Link="Services\TradeMessageParser.cs" />
   </ItemGroup>
 </Project>

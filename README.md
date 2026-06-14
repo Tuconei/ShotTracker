@@ -5,8 +5,8 @@ shot games in FFXIV.
 
 ## Features
 
-- Records a participant's traded gil and converts it into rolls using a saved
-  gil-per-shot price.
+- Arms an expected participant and gil amount, then credits rolls after a
+  matching incoming trade system message.
 - Listens only to `RandomNumber` chat messages from the active participant.
 - Supports any number of winning-number rules.
 - Supports fixed-gil or percentage-of-jackpot payouts.
@@ -20,9 +20,13 @@ shot games in FFXIV.
 
 ## Accounting model
 
-The operator records a trade in the plugin after accepting it in FFXIV. Dalamud
-does not currently expose a stable public trade-completed event, so ShotTracker
-does not infer gil transfers from game memory.
+The operator enters the expected participant and gil amount before the trade.
+ShotTracker then listens for the English-client incoming trade system message
+and credits rolls only when both the normalized character name and exact gil
+amount match. Mismatches remain visible and do not grant rolls.
+
+Manual entry remains available as an explicitly labeled fallback. The ledger
+marks each sale as chat-verified or manual.
 
 The trade must be an exact multiple of the configured shot price. On acceptance:
 
@@ -42,11 +46,17 @@ amounts owed to each party for that night.
 1. Open settings and configure the shot price, revenue split, jackpot, and win
    rules.
 2. Use `/shottracker` and select **Start Night**.
-3. Enter the participant's visible character name and traded gil, then select
-   **Accept Trade**.
-4. Have that participant use `/random`. Rolls from other players are ignored.
-5. Use **Record Manual** only for corrections or testing.
-6. Select **Close Night** to preserve the final ledger and cuts.
+3. Enter the participant's visible character name and expected gil, then select
+   **Wait for Matching Trade**.
+4. Complete the in-game trade. ShotTracker credits the rolls after the matching
+   incoming trade system message appears.
+5. Have that participant use `/random`. Rolls from other players are ignored.
+6. Use manual payment or roll entry only for fallback, corrections, or testing.
+7. Select **Close Night** to preserve the final ledger and cuts.
+
+Trade-message verification currently targets the English FFXIV client text
+(`Name trades you 100,000 Gil.`). Other client languages should use the manual
+fallback until localized message parsing is added.
 
 ## Building
 

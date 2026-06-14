@@ -33,6 +33,7 @@ public sealed class Configuration : IPluginConfiguration
     ];
 
     public NightSession? ActiveSession { get; set; }
+    public PendingTrade? PendingTrade { get; set; }
     public List<NightSession> SessionHistory { get; set; } = [];
 
     public void Save()

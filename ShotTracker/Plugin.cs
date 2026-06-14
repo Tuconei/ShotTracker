@@ -72,6 +72,18 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnChatMessage(IHandleableChatMessage chatMessage)
     {
+        if (chatMessage.LogKind == XivChatType.SystemMessage &&
+            Sessions.PendingTrade != null &&
+            TradeMessageParser.TryParseIncoming(
+                chatMessage.OriginalMessage.ToString(),
+                out var tradePlayer,
+                out var tradeAmount))
+        {
+            var tradeResult = Sessions.ConfirmIncomingTrade(tradePlayer, tradeAmount);
+            MainWindow.SetStatus(tradeResult.Message, !tradeResult.Success);
+            return;
+        }
+
         if (chatMessage.LogKind != XivChatType.RandomNumber || Sessions.ActiveRound == null)
             return;
 
