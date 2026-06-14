@@ -56,7 +56,7 @@ public sealed class SessionManager
         };
         configuration.Save();
         return OperationResult.Ok(
-            $"Waiting for {playerName.Trim()} to trade exactly {amount:N0} gil.");
+            $"Waiting for {playerName.Trim()} to trade {amount:N0} gil.");
     }
 
     public OperationResult CancelTradeVerification()
@@ -75,31 +75,48 @@ public sealed class SessionManager
         if (pending == null)
             return OperationResult.Fail("No trade verification is armed.");
 
-        pending.LastObservedPlayer = playerName.Trim();
-        pending.LastObservedAmount = amount;
-
         if (!NamesMatch(pending.PlayerName, playerName))
         {
+            pending.LastObservedPlayer = playerName.Trim();
+            pending.LastObservedAmount = amount;
             configuration.Save();
             return OperationResult.Fail(
                 $"Ignored {amount:N0} gil from {playerName}; waiting for {pending.PlayerName}.");
         }
 
-        if (amount != pending.ExpectedAmount)
+        if (amount <= 0)
+            return OperationResult.Fail("Incoming trade amount must be greater than zero.");
+
+        var remaining = pending.ExpectedAmount - pending.ReceivedAmount;
+        if (amount > remaining)
         {
+            pending.LastObservedPlayer = playerName.Trim();
+            pending.LastObservedAmount = amount;
             configuration.Save();
             return OperationResult.Fail(
-                $"{playerName} traded {amount:N0} gil; expected exactly {pending.ExpectedAmount:N0}.");
+                $"{playerName} traded {amount:N0} gil, but only {remaining:N0} gil remains.");
         }
 
-        var result = RecordTrade(pending.PlayerName, amount, true);
+        pending.ReceivedAmount += amount;
+        pending.LastObservedPlayer = string.Empty;
+        pending.LastObservedAmount = null;
+
+        if (pending.ReceivedAmount < pending.ExpectedAmount)
+        {
+            configuration.Save();
+            return OperationResult.Ok(
+                $"Verified {pending.ReceivedAmount:N0} of {pending.ExpectedAmount:N0} gil from " +
+                $"{pending.PlayerName}; {pending.ExpectedAmount - pending.ReceivedAmount:N0} gil remains.");
+        }
+
+        var result = RecordTrade(pending.PlayerName, pending.ExpectedAmount, true);
         if (!result.Success)
             return result;
 
         configuration.PendingTrade = null;
         configuration.Save();
         return OperationResult.Ok(
-            $"Verified {amount:N0} gil from {pending.PlayerName} and credited the rolls.");
+            $"Verified {pending.ExpectedAmount:N0} gil from {pending.PlayerName} across all trades and credited the rolls.");
     }
 
     public OperationResult RecordTrade(string playerName, long amount, bool wasVerified = false)

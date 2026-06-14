@@ -32,6 +32,14 @@ static void RunTradeVerificationTest()
         "Incoming trade message should parse.");
     Assert(parsedPlayer == "Test Player", "Trade parser should preserve the player name.");
     Assert(parsedAmount == 100_000, "Trade parser should parse comma-formatted gil.");
+    Assert(
+        TradeMessageParser.TryParseIncoming(
+            "You receive 1,000,000 gil from Test Player.",
+            out parsedPlayer,
+            out parsedAmount),
+        "Incoming trade message with a trailing player should parse.");
+    Assert(parsedPlayer == "Test Player", "Trailing player name should parse.");
+    Assert(parsedAmount == 1_000_000, "One million gil should parse.");
 
     var configuration = new Configuration
     {
@@ -40,34 +48,49 @@ static void RunTradeVerificationTest()
     var manager = new SessionManager(configuration);
     Assert(manager.StartNight().Success, "Night should start.");
     Assert(
-        manager.ArmTradeVerification("Test Player", 200_000).Success,
+        !manager.ArmTradeVerification("Test Player", 250_000).Success,
+        "Requested totals must remain exact shot-price multiples.");
+    Assert(
+        manager.ArmTradeVerification("Test Player", 2_000_000).Success,
         "Valid expected trade should arm.");
     Assert(manager.ActiveRound == null, "Arming a trade must not grant rolls.");
 
     Assert(
-        !manager.ConfirmIncomingTrade("Other Player", 200_000).Success,
+        !manager.ConfirmIncomingTrade("Other Player", 1_000_000).Success,
         "Wrong player should not verify.");
     Assert(manager.ActiveRound == null, "Wrong player must not grant rolls.");
     Assert(configuration.PendingTrade != null, "Wrong player should leave verification armed.");
 
     Assert(
-        !manager.ConfirmIncomingTrade("Test Player", 100_000).Success,
-        "Wrong amount should not verify.");
-    Assert(manager.ActiveRound == null, "Wrong amount must not grant rolls.");
-    Assert(configuration.PendingTrade!.LastObservedAmount == 100_000, "Mismatch should be visible.");
+        manager.ConfirmIncomingTrade("Test Player", 1_000_000).Success,
+        "First capped trade should verify as a partial payment.");
+    Assert(manager.ActiveRound == null, "Partial payment must not grant rolls.");
+    Assert(configuration.PendingTrade!.ReceivedAmount == 1_000_000, "Partial payment should accumulate.");
+    Assert(
+        !manager.ConfirmIncomingTrade("Test Player", 1_000_001).Success,
+        "A chunk larger than the remaining amount should be rejected.");
+    Assert(
+        configuration.PendingTrade.ReceivedAmount == 1_000_000,
+        "Rejected overpayment must not change accumulated progress.");
 
     Assert(
-        manager.ConfirmIncomingTrade("Test Player@Example", 200_000).Success,
-        "Matching cross-world player and amount should verify.");
+        manager.ConfirmIncomingTrade("Test Player@Example", 1_000_000).Success,
+        "Second capped trade should complete verification.");
     Assert(configuration.PendingTrade == null, "Successful verification should clear pending state.");
-    Assert(manager.ActiveRound!.RemainingRolls == 2, "Verified trade should grant purchased rolls.");
+    Assert(manager.ActiveRound!.RemainingRolls == 20, "Accumulated verified trades should grant all purchased rolls.");
     Assert(
         configuration.ActiveSession!.Sales.Single().WasVerified,
         "Verified sale should be marked in the ledger.");
-
     Assert(
-        manager.ArmTradeVerification("Test Player", 100_000).Success,
-        "Additional expected trade should arm.");
+        configuration.ActiveSession.Sales.Single().Amount == 2_000_000,
+        "Ledger should record the requested total once.");
+
+    Assert(manager.ArmTradeVerification("Test Player", 300_000).Success, "Any shot-price multiple should arm.");
+    Assert(manager.ConfirmIncomingTrade("Test Player", 125_000).Success, "Arbitrary trade chunks should accumulate.");
+    Assert(manager.ConfirmIncomingTrade("Test Player", 175_000).Success, "A final chunk should complete the total.");
+    Assert(manager.ActiveRound.RemainingRolls == 23, "Three additional rolls should be credited.");
+
+    Assert(manager.ArmTradeVerification("Test Player", 100_000).Success, "Additional expected trade should arm.");
     Assert(
         manager.RecordTradeManually("Test Player", 100_000).Success,
         "Manual override should record the trade.");

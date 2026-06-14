@@ -47,6 +47,7 @@ public sealed class PendingTrade
 {
     public string PlayerName { get; set; } = string.Empty;
     public long ExpectedAmount { get; set; }
+    public long ReceivedAmount { get; set; }
     public DateTimeOffset ArmedAt { get; set; } = DateTimeOffset.Now;
     public string LastObservedPlayer { get; set; } = string.Empty;
     public long? LastObservedAmount { get; set; }

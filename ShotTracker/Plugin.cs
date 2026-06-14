@@ -1,5 +1,6 @@
 using System;
 using Dalamud.Game.Chat;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Command;
 using Dalamud.Game.Text;
 using Dalamud.Interface.Windowing;
@@ -17,6 +18,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
     [PluginService] internal static IPlayerState PlayerState { get; private set; } = null!;
+    [PluginService] internal static ITargetManager TargetManager { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
     private const string CommandName = "/shottracker";
@@ -65,6 +67,18 @@ public sealed class Plugin : IDalamudPlugin
     public void ToggleConfigUi() => ConfigWindow.Toggle();
     public void ToggleMainUi() => MainWindow.Toggle();
 
+    public bool TryGetTargetedPlayerName(out string playerName)
+    {
+        if (TargetManager.Target is IPlayerCharacter player)
+        {
+            playerName = player.Name.TextValue;
+            return playerName.Length > 0;
+        }
+
+        playerName = string.Empty;
+        return false;
+    }
+
     private void OnCommand(string command, string args)
     {
         MainWindow.Toggle();
@@ -72,16 +86,29 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnChatMessage(IHandleableChatMessage chatMessage)
     {
-        if (chatMessage.LogKind == XivChatType.SystemMessage &&
-            Sessions.PendingTrade != null &&
+        var originalText = chatMessage.OriginalMessage.ExtractText();
+
+        if (Sessions.PendingTrade != null &&
             TradeMessageParser.TryParseIncoming(
-                chatMessage.OriginalMessage.ToString(),
+                originalText,
                 out var tradePlayer,
                 out var tradeAmount))
         {
+            if (tradePlayer.Length == 0)
+                tradePlayer = Sessions.PendingTrade.PlayerName;
+
             var tradeResult = Sessions.ConfirmIncomingTrade(tradePlayer, tradeAmount);
             MainWindow.SetStatus(tradeResult.Message, !tradeResult.Success);
             return;
+        }
+
+        if (Sessions.PendingTrade != null &&
+            TradeMessageParser.LooksLikeGilMessage(originalText))
+        {
+            Log.Information(
+                "Unparsed gil message while waiting for trade. Type={ChatType}, Message={Message}",
+                chatMessage.LogKind,
+                originalText);
         }
 
         if (chatMessage.LogKind != XivChatType.RandomNumber || Sessions.ActiveRound == null)

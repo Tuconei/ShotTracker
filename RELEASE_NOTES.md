@@ -1,23 +1,25 @@
-# v0.1.1 - Trade Verification
+# v0.1.2 - Incremental Trade Verification
 
-ShotTracker now verifies incoming gil payments through FFXIV's trade system
-message before granting purchased rolls.
+ShotTracker now accumulates multiple incoming trades toward a requested total,
+supporting purchases above FFXIV's per-trade gil limit.
 
 ## Added
 
-- Arm an expected participant and exact gil amount before accepting payment.
-- Credit rolls only after a matching incoming trade system message.
-- Reject and display trades with the wrong player or amount.
-- Mark ledger sales as chat-verified or manually entered.
-- Keep an explicit manual fallback for unsupported client languages or
-  corrections.
+- Accumulate multiple verified payments from the armed participant.
+- Display verified, expected, and remaining gil while payment is pending.
+- Accept any requested total that is an exact multiple of the configured shot
+  price.
+- Select the participant directly from the targeted player character.
+- Recognize additional English incoming-gil message forms and log unrecognized
+  gil messages for diagnosis.
+- Reject overpayments and trades from other players without changing progress.
 
 ## Validation
 
 - Debug and Release builds pass against Dalamud SDK 15.
-- The accounting regression harness covers exact payment matching, wrong
-  players, wrong amounts, comma-formatted gil, manual fallback, invalid splits,
-  rerolls, jackpot caps, and night closeout.
+- The accounting regression harness covers capped multi-trade payments,
+  arbitrary payment chunks, overpayment rejection, shot-price multiples,
+  wrong players, manual fallback, rerolls, jackpot caps, and night closeout.
 
 ## Current Limitation
 
