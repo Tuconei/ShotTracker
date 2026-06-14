@@ -5,8 +5,9 @@ shot games in FFXIV.
 
 ## Features
 
-- Arms an expected participant and gil amount, then credits rolls after a
-  matching incoming trade system message.
+- Arms an expected participant and total gil amount, accumulates matching
+  incoming trades, then credits rolls when the requested total is reached.
+- Fills the participant name from the targeted player character.
 - Listens only to `RandomNumber` chat messages from the active participant.
 - Supports any number of winning-number rules.
 - Supports fixed-gil or percentage-of-jackpot payouts.
@@ -20,10 +21,12 @@ shot games in FFXIV.
 
 ## Accounting model
 
-The operator enters the expected participant and gil amount before the trade.
-ShotTracker then listens for the English-client incoming trade system message
-and credits rolls only when both the normalized character name and exact gil
-amount match. Mismatches remain visible and do not grant rolls.
+The operator enters the expected participant and total gil amount before
+trading. ShotTracker listens for English-client incoming trade messages and
+accumulates payments from the armed participant. This supports totals above the
+game's per-trade gil limit. Rolls and accounting are credited once, after the
+verified payments reach the requested total. Wrong-player trades and
+overpayments remain visible and do not change verification progress.
 
 Manual entry remains available as an explicitly labeled fallback. The ledger
 marks each sale as chat-verified or manual.
@@ -46,10 +49,11 @@ amounts owed to each party for that night.
 1. Open settings and configure the shot price, revenue split, jackpot, and win
    rules.
 2. Use `/shottracker` and select **Start Night**.
-3. Enter the participant's visible character name and expected gil, then select
+3. Target the participant and select **Use Target**, or enter their visible
+   character name manually. Enter the total gil and select
    **Wait for Matching Trade**.
-4. Complete the in-game trade. ShotTracker credits the rolls after the matching
-   incoming trade system message appears.
+4. Complete one or more in-game trades. ShotTracker displays accumulated and
+   remaining gil, then credits the rolls when the total is reached.
 5. Have that participant use `/random`. Rolls from other players are ignored.
 6. Use manual payment or roll entry only for fallback, corrections, or testing.
 7. Select **Close Night** to preserve the final ledger and cuts.

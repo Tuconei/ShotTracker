@@ -111,9 +111,11 @@ public sealed class MainWindow : Window, IDisposable
         {
             ImGui.TextColored(
                 new Vector4(1f, 0.78f, 0.25f, 1f),
-                $"Waiting for {pendingTrade.PlayerName} to trade {pendingTrade.ExpectedAmount:N0} gil");
+                $"Waiting for {pendingTrade.PlayerName}: " +
+                $"{pendingTrade.ReceivedAmount:N0} / {pendingTrade.ExpectedAmount:N0} gil verified");
             ImGui.TextDisabled(
-                "Rolls will be credited only after a matching incoming trade system message is detected.");
+                $"{pendingTrade.ExpectedAmount - pendingTrade.ReceivedAmount:N0} gil remaining. " +
+                "Multiple incoming trades are accumulated; rolls are credited when the full amount is verified.");
 
             if (pendingTrade.LastObservedAmount is { } observedAmount)
             {
@@ -142,6 +144,19 @@ public sealed class MainWindow : Window, IDisposable
             ImGui.Text("New participant");
             ImGui.SetNextItemWidth(260);
             ImGui.InputText("Player name", ref participantName, 64);
+            ImGui.SameLine();
+            if (ImGui.Button("Use Target"))
+            {
+                if (plugin.TryGetTargetedPlayerName(out var targetedPlayer))
+                {
+                    participantName = targetedPlayer;
+                    SetStatus($"Selected {targetedPlayer}.", false);
+                }
+                else
+                {
+                    SetStatus("Target a player character first.", true);
+                }
+            }
             ImGui.SetNextItemWidth(180);
             ImGui.InputInt("Traded gil", ref tradeAmount, plugin.Configuration.ShotPrice);
 
