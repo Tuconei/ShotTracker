@@ -1,22 +1,32 @@
-# v0.1.5 - CSV Ledger Sync
+# v0.1.6 - Configurable Wins and Prizes
 
-ShotTracker can now export its complete ledger for spreadsheet review and
-merge exports from multiple bartenders without double-counting shared records.
+ShotTracker now supports broader winning rules and customizable actions when a
+player wins.
 
 ## Added
 
-- Exports settings, winning rules, nights, player rounds, sales, and rolls to
-  spreadsheet-friendly CSV.
-- Imports and merges CSV data using stable record IDs.
-- Recalculates intake, cuts, payouts, remaining rolls, and jackpot totals after
-  a merge.
-- Rejects attempts to combine unrelated active nights.
-- Preserves each bartender's locally active player during a merge.
-- Adds a confirmed action to clear closed-night history without changing the
-  active night or current jackpot.
+- Configure inclusive winning ranges such as `0-99` while retaining exact
+  single-number rules.
+- Select non-gil prizes as a payout type and record the named prize without
+  changing jackpot accounting.
+- Track external prizes in roll, player, night, history, and CSV statistics.
+- Configure each winning rule to highlight its roll in the ledger.
+- Send a private bartender echo with a customizable template.
+- Send a customizable win message to any combination of Say, Yell, Shout,
+  Party, Alliance, Free Company, Novice Network, PvP Team, linkshells, and
+  cross-world linkshells.
+- Use `{player}`, `{roll}`, `{rule}`, `{payout}`, `{prize}`, and `{award}`
+  placeholders in notification templates.
+
+## Preserved
+
+- Target-based participant selection and verified multi-trade payments.
+- CSV ledger export, idempotent multi-bartender synchronization, and stable
+  record IDs.
+- Existing `v0.1.5` configuration and CSV exports remain readable.
 
 ## Validation
 
-- Release build passes against Dalamud SDK 15 with zero warnings.
-- Accounting, trade verification, CSV round-trip, duplicate import, and history
-  clearing regression tests pass.
+- Debug and Release builds pass against Dalamud SDK 15 with zero warnings.
+- Accounting, trade verification, CSV synchronization, winning-range,
+  non-gil-prize, notification-template, and history-clearing tests pass.

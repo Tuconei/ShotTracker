@@ -3,9 +3,10 @@
   <PropertyGroup>
     <AssemblyName>ShotTracker</AssemblyName>
     <RootNamespace>ShotTracker</RootNamespace>
-    <Version>0.1.5</Version>
+    <Version>0.1.6</Version>
     <PackageProjectUrl>https://github.com/Tuconei/ShotTracker</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 </Project>

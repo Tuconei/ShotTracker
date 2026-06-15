@@ -169,6 +169,7 @@ public sealed class MainWindow : Window, IDisposable
 
         ImGui.TextDisabled(
             $"Payouts: {session.TotalPayouts:N0} gil | Jackpot added: {session.JackpotContributions:N0} gil | " +
+            $"External prizes: {session.ExternalPrizesAwarded:N0} | " +
             $"Unallocated reserve: {session.UnallocatedReserve:N0} gil");
     }
 
@@ -249,7 +250,7 @@ public sealed class MainWindow : Window, IDisposable
         ImGui.SameLine();
         ImGui.TextDisabled(
             $"Paid {round.PaidGil:N0} | Purchased {round.PurchasedRolls} | Remaining {round.RemainingRolls} | " +
-            $"Payout {round.TotalPayout:N0}");
+            $"Payout {round.TotalPayout:N0} | External prizes {round.ExternalPrizesWon:N0}");
 
         participantName = round.PlayerName;
         ImGui.SetNextItemWidth(180);
@@ -292,7 +293,7 @@ public sealed class MainWindow : Window, IDisposable
 
         if (!ImGui.BeginTable(
                 "RollTable",
-                5,
+                6,
                 ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchProp))
         {
             return;
@@ -301,6 +302,7 @@ public sealed class MainWindow : Window, IDisposable
         ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed, 38);
         ImGui.TableSetupColumn("Roll", ImGuiTableColumnFlags.WidthFixed, 65);
         ImGui.TableSetupColumn("Outcome");
+        ImGui.TableSetupColumn("External prize");
         ImGui.TableSetupColumn("Payout", ImGuiTableColumnFlags.WidthFixed, 110);
         ImGui.TableSetupColumn("Source", ImGuiTableColumnFlags.WidthFixed, 70);
         ImGui.TableHeadersRow();
@@ -308,12 +310,23 @@ public sealed class MainWindow : Window, IDisposable
         foreach (var roll in round.Rolls.AsEnumerable().Reverse())
         {
             ImGui.TableNextRow();
+            if (roll.HighlightWin)
+            {
+                ImGui.TableSetBgColor(
+                    ImGuiTableBgTarget.RowBg0,
+                    ImGui.GetColorU32(new Vector4(0.18f, 0.48f, 0.24f, 0.55f)));
+            }
+
             ImGui.TableNextColumn();
             ImGui.Text(roll.Counter.ToString());
             ImGui.TableNextColumn();
             ImGui.Text(roll.Value.ToString());
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(roll.Outcome);
+            ImGui.TableNextColumn();
+            ImGui.TextUnformatted(roll.ExternalPrizes.Count == 0
+                ? "-"
+                : string.Join(", ", roll.ExternalPrizes));
             ImGui.TableNextColumn();
             ImGui.Text($"{roll.Payout:N0}");
             ImGui.TableNextColumn();
@@ -385,7 +398,8 @@ public sealed class MainWindow : Window, IDisposable
             var ended = session.EndedAt?.ToLocalTime().ToString("g") ?? "Open";
             ImGui.BulletText(
                 $"{ended}: intake {session.TotalIntake:N0}, payouts {session.TotalPayouts:N0}, " +
-                $"house {session.HouseCut:N0}, dealer {session.DealerCut:N0}, jackpot {session.EndingJackpot:N0}");
+                $"external prizes {session.ExternalPrizesAwarded:N0}, house {session.HouseCut:N0}, " +
+                $"dealer {session.DealerCut:N0}, jackpot {session.EndingJackpot:N0}");
         }
     }
 

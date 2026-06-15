@@ -9,10 +9,15 @@ shot games in FFXIV.
   incoming trades, then credits rolls when the requested total is reached.
 - Fills the participant name from the targeted player character.
 - Listens only to `RandomNumber` chat messages from the active participant.
-- Supports any number of winning-number rules.
+- Supports any number of winning-number rules, including inclusive ranges such
+  as `0-99`.
 - Supports fixed-gil or percentage-of-jackpot payouts.
+- Supports non-gil prize payouts outside the jackpot, such as minions.
 - Supports winning numbers that grant a free reroll.
-- Tracks each roll's counter, result, matched rules, payout, and source.
+- Configures per-rule win actions: highlighted ledger rows, local bartender
+  echoes, and templated messages sent to multiple selected chat channels.
+- Tracks each roll's counter, result, matched rules, gil payout, external prizes,
+  and source.
 - Splits every sale between jackpot, house, dealer, and an optional unallocated
   reserve.
 - Carries the jackpot balance between nights.
@@ -43,6 +48,9 @@ The trade must be an exact multiple of the configured shot price. On acceptance:
 All configured win payouts come from the jackpot. A payout can be a fixed gil
 amount or a percentage of the jackpot balance at the time of the roll. Payouts
 are capped at the available jackpot, so the ledger never becomes negative.
+A winning rule's payout type can instead be a named non-gil prize. These prizes
+are recorded in the roll ledger and night statistics without changing the
+jackpot.
 
 Ending a night saves its totals to history. The house and dealer figures are the
 amounts owed to each party for that night.

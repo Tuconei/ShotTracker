@@ -29,6 +29,7 @@ public sealed class Plugin : IDalamudPlugin
     public CsvSyncService CsvSync { get; }
     public WindowSystem WindowSystem { get; } = new("ShotTracker");
 
+    private WinNotificationDispatcher WinNotifications { get; }
     private ConfigWindow ConfigWindow { get; }
     private MainWindow MainWindow { get; }
     private string lastTradeFingerprint = string.Empty;
@@ -39,6 +40,7 @@ public sealed class Plugin : IDalamudPlugin
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Sessions = new SessionManager(Configuration);
         CsvSync = new CsvSyncService(Configuration);
+        WinNotifications = new WinNotificationDispatcher();
         ConfigWindow = new ConfigWindow(this);
         MainWindow = new MainWindow(this);
 
@@ -52,6 +54,7 @@ public sealed class Plugin : IDalamudPlugin
 
         ChatGui.ChatMessage += OnChatMessage;
         ChatGui.LogMessage += OnLogMessage;
+        Sessions.WinRecorded += WinNotifications.Dispatch;
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
@@ -65,6 +68,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         ChatGui.ChatMessage -= OnChatMessage;
         ChatGui.LogMessage -= OnLogMessage;
+        Sessions.WinRecorded -= WinNotifications.Dispatch;
         PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi -= ToggleConfigUi;
         PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;

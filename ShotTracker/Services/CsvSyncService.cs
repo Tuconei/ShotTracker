@@ -36,24 +36,36 @@ public sealed class CsvSyncService
         "PurchasedRolls",
         "RemainingRolls",
         "TotalPayout",
+        "ExternalPrizesWon",
         "Counter",
         "RollValue",
         "WasManual",
         "GrantedReroll",
         "Payout",
+        "ExternalPrizes",
+        "IsWin",
+        "HighlightWin",
         "Outcome",
         "TotalIntake",
         "JackpotContributions",
         "TotalPayouts",
+        "ExternalPrizesAwarded",
         "ShotPrice",
         "JackpotPercent",
         "HousePercent",
         "DealerPercent",
         "Label",
         "WinningNumber",
+        "RangeEnd",
         "PayoutKind",
         "FixedPayoutGil",
         "JackpotPayoutPercent",
+        "ExternalPrize",
+        "HighlightWinningRoll",
+        "SendEcho",
+        "EchoMessage",
+        "ChatMessage",
+        "ChatChannels",
         "Enabled",
     ];
 
@@ -98,10 +110,17 @@ public sealed class CsvSyncService
                     ["RecordId"] = Format(rule.Id),
                     ["Label"] = rule.Label,
                     ["WinningNumber"] = Format(rule.Number),
+                    ["RangeEnd"] = Format(rule.RangeEnd),
                     ["PayoutKind"] = rule.PayoutKind.ToString(),
                     ["FixedPayoutGil"] = Format(rule.FixedPayoutGil),
                     ["JackpotPayoutPercent"] = Format(rule.JackpotPayoutPercent),
+                    ["ExternalPrize"] = rule.ExternalPrize,
                     ["GrantedReroll"] = Format(rule.GrantsReroll),
+                    ["HighlightWinningRoll"] = Format(rule.HighlightWinningRoll),
+                    ["SendEcho"] = Format(rule.SendEcho),
+                    ["EchoMessage"] = rule.EchoMessage,
+                    ["ChatMessage"] = rule.ChatMessage,
+                    ["ChatChannels"] = string.Join(";", rule.ChatChannels ?? []),
                     ["Enabled"] = Format(rule.Enabled),
                 });
             }
@@ -309,6 +328,7 @@ public sealed class CsvSyncService
             round.PaidGil = sales.Sum(sale => sale.Amount);
             round.PurchasedRolls = sales.Sum(sale => sale.RollsPurchased);
             round.TotalPayout = round.Rolls.Sum(roll => roll.Payout);
+            round.ExternalPrizesWon = round.Rolls.Sum(roll => roll.ExternalPrizes.Count);
             var consumedRolls = round.Rolls.Count(roll => !roll.GrantedReroll);
             round.RemainingRolls = Math.Max(0, round.PurchasedRolls - consumedRolls);
         }
@@ -319,6 +339,7 @@ public sealed class CsvSyncService
         session.DealerCut = session.Sales.Sum(sale => sale.DealerCut);
         session.UnallocatedReserve = session.Sales.Sum(sale => sale.UnallocatedReserve);
         session.TotalPayouts = session.Rounds.Sum(round => round.TotalPayout);
+        session.ExternalPrizesAwarded = session.Rounds.Sum(round => round.ExternalPrizesWon);
         session.EndingJackpot = Math.Max(
             0,
             session.StartingJackpot + session.JackpotContributions - session.TotalPayouts);
@@ -392,6 +413,7 @@ public sealed class CsvSyncService
                     Id = ParseGuid(row, indexes, "RecordId"),
                     Label = Value(row, indexes, "Label"),
                     Number = ParseInt(row, indexes, "WinningNumber"),
+                    RangeEnd = ParseNullableInt(row, indexes, "RangeEnd"),
                     PayoutKind = Enum.TryParse<PayoutKind>(
                         Value(row, indexes, "PayoutKind"),
                         true,
@@ -400,7 +422,25 @@ public sealed class CsvSyncService
                         : PayoutKind.FixedGil,
                     FixedPayoutGil = ParseLong(row, indexes, "FixedPayoutGil"),
                     JackpotPayoutPercent = ParseFloat(row, indexes, "JackpotPayoutPercent"),
+                    ExternalPrize = Value(row, indexes, "ExternalPrize"),
                     GrantsReroll = ParseBool(row, indexes, "GrantedReroll"),
+                    HighlightWinningRoll = ParseBool(
+                        row,
+                        indexes,
+                        "HighlightWinningRoll",
+                        defaultValue: true),
+                    SendEcho = ParseBool(row, indexes, "SendEcho"),
+                    EchoMessage = ValueOrDefault(
+                        row,
+                        indexes,
+                        "EchoMessage",
+                        "WIN: {player} rolled {roll} ({rule}) - {award}"),
+                    ChatMessage = ValueOrDefault(
+                        row,
+                        indexes,
+                        "ChatMessage",
+                        "Congratulations {player}! You rolled {roll} and won {award}!"),
+                    ChatChannels = ParseChatChannels(row, indexes),
                     Enabled = ParseBool(row, indexes, "Enabled"),
                 });
                 continue;
@@ -433,6 +473,7 @@ public sealed class CsvSyncService
                         PurchasedRolls = ParseInt(row, indexes, "PurchasedRolls"),
                         RemainingRolls = ParseInt(row, indexes, "RemainingRolls"),
                         TotalPayout = ParseLong(row, indexes, "TotalPayout"),
+                        ExternalPrizesWon = ParseInt(row, indexes, "ExternalPrizesWon"),
                     });
                     break;
                 case "sale":
@@ -460,6 +501,12 @@ public sealed class CsvSyncService
                         session.Rounds.Add(round);
                     }
 
+                    var outcome = Value(row, indexes, "Outcome");
+                    var isWin = ParseBool(
+                        row,
+                        indexes,
+                        "IsWin",
+                        defaultValue: !outcome.Equals("No win", StringComparison.OrdinalIgnoreCase));
                     round.Rolls.Add(new RollRecord
                     {
                         Id = ParseGuid(row, indexes, "RecordId"),
@@ -469,7 +516,14 @@ public sealed class CsvSyncService
                         WasManual = ParseBool(row, indexes, "WasManual"),
                         GrantedReroll = ParseBool(row, indexes, "GrantedReroll"),
                         Payout = ParseLong(row, indexes, "Payout"),
-                        Outcome = Value(row, indexes, "Outcome"),
+                        ExternalPrizes = ParseList(row, indexes, "ExternalPrizes"),
+                        IsWin = isWin,
+                        HighlightWin = ParseBool(
+                            row,
+                            indexes,
+                            "HighlightWin",
+                            defaultValue: isWin),
+                        Outcome = outcome,
                     });
                     break;
                 default:
@@ -506,6 +560,8 @@ public sealed class CsvSyncService
 
         if (settings.WinRules.Any(rule =>
                 rule.Number is < 0 or > 999 ||
+                rule.RangeEnd is < 0 or > 999 ||
+                rule.RangeEnd is { } rangeEnd && rangeEnd < rule.Number ||
                 rule.FixedPayoutGil < 0 ||
                 !float.IsFinite(rule.JackpotPayoutPercent) ||
                 rule.JackpotPayoutPercent < 0))
@@ -531,6 +587,7 @@ public sealed class CsvSyncService
             ["DealerCut"] = Format(session.DealerCut),
             ["UnallocatedReserve"] = Format(session.UnallocatedReserve),
             ["TotalPayouts"] = Format(session.TotalPayouts),
+            ["ExternalPrizesAwarded"] = Format(session.ExternalPrizesAwarded),
         });
 
         foreach (var round in session.Rounds.OrderBy(item => item.StartedAt))
@@ -547,6 +604,7 @@ public sealed class CsvSyncService
                 ["PurchasedRolls"] = Format(round.PurchasedRolls),
                 ["RemainingRolls"] = Format(round.RemainingRolls),
                 ["TotalPayout"] = Format(round.TotalPayout),
+                ["ExternalPrizesWon"] = Format(round.ExternalPrizesWon),
             });
 
             foreach (var roll in round.Rolls.OrderBy(item => item.Timestamp))
@@ -564,6 +622,9 @@ public sealed class CsvSyncService
                     ["WasManual"] = Format(roll.WasManual),
                     ["GrantedReroll"] = Format(roll.GrantedReroll),
                     ["Payout"] = Format(roll.Payout),
+                    ["ExternalPrizes"] = string.Join(";", roll.ExternalPrizes),
+                    ["IsWin"] = Format(roll.IsWin),
+                    ["HighlightWin"] = Format(roll.HighlightWin),
                     ["Outcome"] = roll.Outcome,
                 });
             }
@@ -696,6 +757,16 @@ public sealed class CsvSyncService
             : string.Empty;
     }
 
+    private static string ValueOrDefault(
+        IReadOnlyList<string> row,
+        IReadOnlyDictionary<string, int> indexes,
+        string column,
+        string defaultValue)
+    {
+        var value = Value(row, indexes, column);
+        return value.Length == 0 ? defaultValue : value;
+    }
+
     private static Guid ParseGuid(
         IReadOnlyList<string> row,
         IReadOnlyDictionary<string, int> indexes,
@@ -765,12 +836,53 @@ public sealed class CsvSyncService
             : 0;
     }
 
-    private static bool ParseBool(
+    private static int? ParseNullableInt(
         IReadOnlyList<string> row,
         IReadOnlyDictionary<string, int> indexes,
         string column)
     {
-        return bool.TryParse(Value(row, indexes, column), out var value) && value;
+        var text = Value(row, indexes, column);
+        return text.Length == 0
+            ? null
+            : int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+                ? value
+                : throw new InvalidDataException($"Invalid {column}.");
+    }
+
+    private static bool ParseBool(
+        IReadOnlyList<string> row,
+        IReadOnlyDictionary<string, int> indexes,
+        string column,
+        bool defaultValue = false)
+    {
+        var text = Value(row, indexes, column);
+        return text.Length == 0
+            ? defaultValue
+            : bool.TryParse(text, out var value) && value;
+    }
+
+    private static List<string> ParseList(
+        IReadOnlyList<string> row,
+        IReadOnlyDictionary<string, int> indexes,
+        string column)
+    {
+        return Value(row, indexes, column)
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+    }
+
+    private static List<WinChatChannel> ParseChatChannels(
+        IReadOnlyList<string> row,
+        IReadOnlyDictionary<string, int> indexes)
+    {
+        return ParseList(row, indexes, "ChatChannels")
+            .Select(value => Enum.TryParse<WinChatChannel>(value, true, out var channel)
+                ? (WinChatChannel?)channel
+                : null)
+            .Where(channel => channel.HasValue)
+            .Select(channel => channel!.Value)
+            .Distinct()
+            .ToList();
     }
 
     private static float ParseFloat(
@@ -794,6 +906,7 @@ public sealed class CsvSyncService
         value?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty;
     private static string Format(long value) => value.ToString(CultureInfo.InvariantCulture);
     private static string Format(int value) => value.ToString(CultureInfo.InvariantCulture);
+    private static string Format(int? value) => value?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
     private static string Format(float value) => value.ToString("R", CultureInfo.InvariantCulture);
     private static string Format(bool value) => value ? "true" : "false";
 
