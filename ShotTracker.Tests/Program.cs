@@ -5,6 +5,8 @@ using ShotTracker.Services;
 RunInvalidSplitTest();
 RunTradeVerificationTest();
 RunNightLifecycleTest();
+RunCsvSyncTest();
+RunClearHistoryTest();
 Console.WriteLine("All ShotTracker accounting tests passed.");
 
 static void RunInvalidSplitTest()
@@ -163,6 +165,89 @@ static void RunNightLifecycleTest()
     Assert(manager.CloseNight().Success, "Night should close.");
     Assert(configuration.ActiveSession == null, "Closed night should no longer be active.");
     Assert(configuration.SessionHistory.Count == 1, "Closed night should be stored in history.");
+}
+
+static void RunCsvSyncTest()
+{
+    var first = new Configuration
+    {
+        JackpotBalance = 1_000,
+        ShotPrice = 250,
+        JackpotPercent = 60,
+        HousePercent = 30,
+        DealerPercent = 10,
+        WinRules = [new WinRule { Label = "Winner, big", Number = 777, FixedPayoutGil = 100 }],
+    };
+    var firstManager = new SessionManager(first);
+    Assert(firstManager.StartNight().Success, "First bartender should start the shared night.");
+
+    var seedPath = Path.Combine(Path.GetTempPath(), $"ShotTracker-seed-{Guid.NewGuid():N}.csv");
+    var mergedPath = Path.Combine(Path.GetTempPath(), $"ShotTracker-merged-{Guid.NewGuid():N}.csv");
+    try
+    {
+        Assert(new CsvSyncService(first).Export(seedPath).Success, "Seed export should succeed.");
+
+        var second = new Configuration();
+        Assert(new CsvSyncService(second).Import(seedPath).Success, "Second bartender should import the shared night.");
+        var secondManager = new SessionManager(second);
+        Assert(secondManager.ActiveSession?.Id == first.ActiveSession?.Id, "Imported active night should keep its ID.");
+        Assert(second.ShotPrice == 250, "Import should sync the shot price.");
+        Assert(second.WinRules.Single().Label == "Winner, big", "Import should sync CSV-escaped winning rules.");
+
+        Assert(firstManager.RecordTrade("First Player", 500, true).Success, "First sale should record.");
+        Assert(firstManager.RecordRoll("First Player", 123).Success, "First roll should record.");
+        Assert(secondManager.RecordTrade("Second Player", 750, true).Success, "Second sale should record.");
+        Assert(secondManager.RecordRoll("Second Player", 777).Success, "Second bartender's roll should record.");
+        Assert(new CsvSyncService(second).Export(mergedPath).Success, "Merged export should succeed.");
+
+        var firstSync = new CsvSyncService(first);
+        Assert(firstSync.Import(mergedPath).Success, "First bartender should merge the second export.");
+        Assert(
+            firstManager.ActiveRound?.PlayerName == "First Player",
+            "Import should not replace the local bartender's active player.");
+        Assert(first.ActiveSession!.Sales.Count == 2, "Merged night should contain both unique sales.");
+        Assert(first.ActiveSession.Rounds.Count == 2, "Merged night should contain both player rounds.");
+        Assert(first.ActiveSession.TotalIntake == 1_250, "Merged intake should be recalculated from unique sales.");
+        Assert(firstSync.Import(mergedPath).Success, "Importing the same file twice should succeed.");
+        Assert(first.ActiveSession.Sales.Count == 2, "Repeated import must not duplicate sales.");
+        Assert(
+            first.ActiveSession.Rounds.Sum(round => round.Rolls.Count) == 2,
+            "Repeated import must not duplicate rolls.");
+
+        var unrelated = new Configuration();
+        Assert(new SessionManager(unrelated).StartNight().Success, "Unrelated night should start.");
+        Assert(
+            !new CsvSyncService(unrelated).Import(seedPath).Success,
+            "Import should reject a different active-night ID.");
+    }
+    finally
+    {
+        File.Delete(seedPath);
+        File.Delete(mergedPath);
+    }
+}
+
+static void RunClearHistoryTest()
+{
+    var activeSession = new NightSession { StartingJackpot = 900, EndingJackpot = 900 };
+    var configuration = new Configuration
+    {
+        JackpotBalance = 900,
+        ActiveSession = activeSession,
+        SessionHistory =
+        [
+            new NightSession { EndedAt = DateTimeOffset.Now.AddDays(-1) },
+            new NightSession { EndedAt = DateTimeOffset.Now.AddDays(-2) },
+        ],
+    };
+    var manager = new SessionManager(configuration);
+
+    var result = manager.ClearHistory();
+    Assert(result.Success, "Stored history should clear.");
+    Assert(configuration.SessionHistory.Count == 0, "All closed-night history should be removed.");
+    Assert(ReferenceEquals(configuration.ActiveSession, activeSession), "Active night must be preserved.");
+    Assert(configuration.JackpotBalance == 900, "Current jackpot must be preserved.");
+    Assert(!manager.ClearHistory().Success, "Clearing empty history should report that nothing was removed.");
 }
 
 static void Assert(bool condition, string message)

@@ -286,6 +286,19 @@ public sealed class SessionManager
         return OperationResult.Ok("Night closed and saved to history.");
     }
 
+    public OperationResult ClearHistory()
+    {
+        var count = configuration.SessionHistory.Count;
+        if (count == 0)
+            return OperationResult.Fail("There is no stored night history to clear.");
+
+        configuration.SessionHistory.Clear();
+        configuration.Save();
+        return OperationResult.Ok(
+            $"Cleared {count} stored night{(count == 1 ? string.Empty : "s")}. " +
+            "The active night and current jackpot were preserved.");
+    }
+
     private void FinishActiveRoundInternal()
     {
         var session = ActiveSession;

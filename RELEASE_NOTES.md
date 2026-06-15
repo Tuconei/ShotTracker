@@ -1,24 +1,22 @@
-# v0.1.4 - Production Trade Verification
+# v0.1.5 - CSV Ledger Sync
 
-Trade verification is confirmed working through Dalamud's structured FFXIV
-log-message stream. Temporary live diagnostics have been removed for normal
-venue use.
+ShotTracker can now export its complete ledger for spreadsheet review and
+merge exports from multiple bartenders without double-counting shared records.
 
-## Changed
+## Added
 
-- Retains structured `LogMessage` trade detection and formatted-chat fallback.
-- Retains duplicate-event protection and incremental payment tracking.
-- Removes the temporary trade diagnostics from the plugin window.
-- Removes per-event trade logging from `/xllog`.
-- Keeps one startup entry so the loaded ShotTracker version remains visible.
+- Exports settings, winning rules, nights, player rounds, sales, and rolls to
+  spreadsheet-friendly CSV.
+- Imports and merges CSV data using stable record IDs.
+- Recalculates intake, cuts, payouts, remaining rolls, and jackpot totals after
+  a merge.
+- Rejects attempts to combine unrelated active nights.
+- Preserves each bartender's locally active player during a merge.
+- Adds a confirmed action to clear closed-night history without changing the
+  active night or current jackpot.
 
 ## Validation
 
-- Debug and Release builds pass against Dalamud SDK 15.
-- The accounting regression harness passes.
-
-## Current Limitation
-
-Trade-message verification currently recognizes the English client message
-format. Other client languages can use the manual fallback until localized
-parsers are added.
+- Release build passes against Dalamud SDK 15 with zero warnings.
+- Accounting, trade verification, CSV round-trip, duplicate import, and history
+  clearing regression tests pass.

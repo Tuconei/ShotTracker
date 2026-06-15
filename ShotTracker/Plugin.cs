@@ -26,6 +26,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public Configuration Configuration { get; }
     public SessionManager Sessions { get; }
+    public CsvSyncService CsvSync { get; }
     public WindowSystem WindowSystem { get; } = new("ShotTracker");
 
     private ConfigWindow ConfigWindow { get; }
@@ -37,6 +38,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Sessions = new SessionManager(Configuration);
+        CsvSync = new CsvSyncService(Configuration);
         ConfigWindow = new ConfigWindow(this);
         MainWindow = new MainWindow(this);
 
