@@ -11,5 +11,6 @@
     <Compile Include="..\ShotTracker\Services\SessionManager.cs" Link="Services\SessionManager.cs" />
     <Compile Include="..\ShotTracker\Services\CsvSyncService.cs" Link="Services\CsvSyncService.cs" />
     <Compile Include="..\ShotTracker\Services\TradeMessageParser.cs" Link="Services\TradeMessageParser.cs" />
+    <Compile Include="..\ShotTracker\Services\WinNotificationFormatter.cs" Link="Services\WinNotificationFormatter.cs" />
   </ItemGroup>
 </Project>

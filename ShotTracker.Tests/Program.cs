@@ -4,6 +4,8 @@ using ShotTracker.Services;
 
 RunInvalidSplitTest();
 RunTradeVerificationTest();
+RunWinningRangeTest();
+RunNotificationFormattingTest();
 RunNightLifecycleTest();
 RunCsvSyncTest();
 RunClearHistoryTest();
@@ -130,6 +132,14 @@ static void RunNightLifecycleTest()
                 Number = 1,
                 PayoutKind = PayoutKind.FixedGil,
                 FixedPayoutGil = 500,
+                ExternalPrize = "Should not be awarded",
+            },
+            new WinRule
+            {
+                Label = "Minion",
+                Number = 99,
+                PayoutKind = PayoutKind.NonGilPrize,
+                ExternalPrize = "Wind-up Cursor minion",
             },
         ],
     };
@@ -154,6 +164,13 @@ static void RunNightLifecycleTest()
     Assert(configuration.JackpotBalance == 50, "Top-up should replenish jackpot.");
     Assert(manager.RecordRoll("Test Player", 1).Success, "Fixed win should be accepted.");
     Assert(configuration.JackpotBalance == 0, "Fixed payout should be capped at jackpot balance.");
+    Assert(
+        configuration.ActiveSession!.ExternalPrizesAwarded == 0,
+        "Gil payout rules must not award a stored non-gil prize name.");
+    var prizeResult = manager.RecordRoll("Test Player", 99);
+    Assert(prizeResult.Success, "External-prize win should be accepted.");
+    Assert(prizeResult.Message.Contains("Wind-up Cursor minion"), "Prize should be included in the result.");
+    Assert(configuration.JackpotBalance == 0, "External prize must not affect the jackpot.");
 
     var session = configuration.ActiveSession!;
     Assert(session.TotalIntake == 400, "Night intake should include all trades.");
@@ -161,6 +178,11 @@ static void RunNightLifecycleTest()
     Assert(session.HouseCut == 160, "House cut should total correctly.");
     Assert(session.DealerCut == 40, "Dealer cut should total correctly.");
     Assert(session.TotalPayouts == 1_200, "Payout total should include capped awards.");
+    Assert(session.ExternalPrizesAwarded == 1, "Night should count external prizes.");
+    Assert(session.Rounds[0].ExternalPrizesWon == 1, "Player should count external prizes.");
+    Assert(
+        session.Rounds[0].Rolls.Last().ExternalPrizes.SequenceEqual(["Wind-up Cursor minion"]),
+        "Roll ledger should preserve the external prize.");
 
     Assert(manager.CloseNight().Success, "Night should close.");
     Assert(configuration.ActiveSession == null, "Closed night should no longer be active.");
@@ -176,7 +198,21 @@ static void RunCsvSyncTest()
         JackpotPercent = 60,
         HousePercent = 30,
         DealerPercent = 10,
-        WinRules = [new WinRule { Label = "Winner, big", Number = 777, FixedPayoutGil = 100 }],
+        WinRules =
+        [
+            new WinRule
+            {
+                Label = "Winner, big",
+                Number = 700,
+                RangeEnd = 799,
+                FixedPayoutGil = 100,
+                ExternalPrize = "Test prize",
+                SendEcho = true,
+                EchoMessage = "Echo {player}",
+                ChatMessage = "Winner {roll}",
+                ChatChannels = [WinChatChannel.Party, WinChatChannel.FreeCompany],
+            },
+        ],
     };
     var firstManager = new SessionManager(first);
     Assert(firstManager.StartNight().Success, "First bartender should start the shared night.");
@@ -193,6 +229,12 @@ static void RunCsvSyncTest()
         Assert(secondManager.ActiveSession?.Id == first.ActiveSession?.Id, "Imported active night should keep its ID.");
         Assert(second.ShotPrice == 250, "Import should sync the shot price.");
         Assert(second.WinRules.Single().Label == "Winner, big", "Import should sync CSV-escaped winning rules.");
+        Assert(second.WinRules.Single().RangeEnd == 799, "Import should sync winning ranges.");
+        Assert(second.WinRules.Single().SendEcho, "Import should sync echo settings.");
+        Assert(
+            second.WinRules.Single().ChatChannels.SequenceEqual(
+                [WinChatChannel.Party, WinChatChannel.FreeCompany]),
+            "Import should sync selected chat channels.");
 
         Assert(firstManager.RecordTrade("First Player", 500, true).Success, "First sale should record.");
         Assert(firstManager.RecordRoll("First Player", 123).Success, "First roll should record.");
@@ -248,6 +290,73 @@ static void RunClearHistoryTest()
     Assert(ReferenceEquals(configuration.ActiveSession, activeSession), "Active night must be preserved.");
     Assert(configuration.JackpotBalance == 900, "Current jackpot must be preserved.");
     Assert(!manager.ClearHistory().Success, "Clearing empty history should report that nothing was removed.");
+}
+
+static void RunWinningRangeTest()
+{
+    var rangeRule = new WinRule
+    {
+        Label = "Range",
+        PayoutKind = PayoutKind.FixedGil,
+        FixedPayoutGil = 10,
+    };
+    Assert(rangeRule.TrySetWinningRange("10-20"), "Valid range should parse.");
+    Assert(rangeRule.Number == 10 && rangeRule.RangeEnd == 20, "Range bounds should be stored.");
+    Assert(rangeRule.Matches(10) && rangeRule.Matches(20), "Range bounds should be inclusive.");
+    Assert(!rangeRule.Matches(9) && !rangeRule.Matches(21), "Values outside the range should not match.");
+    Assert(!rangeRule.TrySetWinningRange("20-10"), "Reversed range should be rejected.");
+    Assert(!rangeRule.TrySetWinningRange("0-1000"), "Out-of-bounds range should be rejected.");
+
+    var configuration = new Configuration
+    {
+        JackpotBalance = 100,
+        WinRules = [rangeRule],
+    };
+    var manager = new SessionManager(configuration);
+    var winEvents = 0;
+    manager.WinRecorded += (_, roll, rules) =>
+    {
+        winEvents++;
+        Assert(roll.IsWin, "Win event should contain a winning roll.");
+        Assert(roll.HighlightWin, "Default win action should highlight the winning roll.");
+        Assert(rules.Count == 1, "Range test should match exactly one rule.");
+    };
+
+    Assert(manager.StartNight().Success, "Range test night should start.");
+    Assert(manager.RecordTrade("Range Player", 400).Success, "Range test trade should be accepted.");
+    Assert(manager.RecordRoll("Range Player", 9).Success, "Below-range roll should be accepted.");
+    Assert(manager.RecordRoll("Range Player", 10).Success, "Range start should be accepted.");
+    Assert(manager.RecordRoll("Range Player", 20).Success, "Range end should be accepted.");
+    Assert(manager.RecordRoll("Range Player", 21).Success, "Above-range roll should be accepted.");
+    Assert(configuration.ActiveSession!.TotalPayouts == 20, "Only rolls inside the range should pay.");
+    Assert(winEvents == 2, "Win actions should fire only for rolls inside the range.");
+}
+
+static void RunNotificationFormattingTest()
+{
+    var rule = new WinRule { Label = "Minion win", ExternalPrize = "Wind-up Cursor" };
+    var roll = new RollRecord
+    {
+        Value = 99,
+        Payout = 12_500,
+        ExternalPrizes = ["Wind-up Cursor"],
+    };
+
+    var message = WinNotificationFormatter.Format(
+        "{player} rolled {roll}: {rule}; {payout}; {prize}; {award}",
+        "Test Player",
+        roll,
+        rule);
+    Assert(message.Contains("Test Player rolled 99"), "Player and roll placeholders should expand.");
+    Assert(message.Contains("12,500 gil"), "Payout placeholder should expand.");
+    Assert(message.Contains("Wind-up Cursor"), "Prize placeholder should expand.");
+    Assert(!message.Contains('{'), "Known placeholders should all be replaced.");
+    Assert(
+        WinNotificationFormatter.BuildChatCommand(WinChatChannel.Party, "Winner!") == "/party Winner!",
+        "Selected chat channel should produce the matching game command.");
+    Assert(
+        WinNotificationFormatter.GetChannelLabel(WinChatChannel.CrossWorldLinkshell3) == "CW Linkshell 3",
+        "Cross-world linkshell label should be readable.");
 }
 
 static void Assert(bool condition, string message)

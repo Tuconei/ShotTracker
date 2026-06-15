@@ -1,14 +1,17 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using ShotTracker.Models;
+using ShotTracker.Services;
 
 namespace ShotTracker.Windows;
 
 public sealed class ConfigWindow : Window, IDisposable
 {
     private readonly Configuration configuration;
+    private readonly Dictionary<Guid, string> winningRangeInputs = [];
 
     public ConfigWindow(Plugin plugin)
         : base("ShotTracker Settings###ShotTrackerConfig")
@@ -81,7 +84,7 @@ public sealed class ConfigWindow : Window, IDisposable
 
         ImGui.TextDisabled("Payouts are deducted from this jackpot. Fixed and percentage payouts are capped at its balance.");
         ImGui.Separator();
-        ImGui.Text("Winning numbers");
+        ImGui.Text("Winning numbers and ranges");
 
         var removeIndex = -1;
         for (var i = 0; i < configuration.WinRules.Count; i++)
@@ -107,17 +110,27 @@ public sealed class ConfigWindow : Window, IDisposable
                 configuration.Save();
             }
 
-            var number = rule.Number;
+            if (!winningRangeInputs.TryGetValue(rule.Id, out var winningRange))
+                winningRange = rule.WinningRangeText;
+
             ImGui.SetNextItemWidth(120);
-            if (ImGui.InputInt("Winning number", ref number))
+            if (ImGui.InputText("Winning range", ref winningRange, 7))
             {
-                rule.Number = Math.Clamp(number, 0, 999);
-                configuration.Save();
+                winningRangeInputs[rule.Id] = winningRange;
+                if (rule.TrySetWinningRange(winningRange))
+                    configuration.Save();
             }
+            else
+            {
+                winningRangeInputs[rule.Id] = winningRange;
+            }
+
+            if (!rule.TrySetWinningRange(winningRange))
+                ImGui.TextColored(new Vector4(1f, 0.35f, 0.35f, 1f), "Use 0-999 or a range such as 0-99.");
 
             var kind = (int)rule.PayoutKind;
             ImGui.SetNextItemWidth(180);
-            if (ImGui.Combo("Payout type", ref kind, "Fixed gil\0Jackpot percentage\0"))
+            if (ImGui.Combo("Payout type", ref kind, "Fixed gil\0Jackpot percentage\0Non-gil prize\0"))
             {
                 rule.PayoutKind = (PayoutKind)kind;
                 configuration.Save();
@@ -133,7 +146,7 @@ public sealed class ConfigWindow : Window, IDisposable
                     configuration.Save();
                 }
             }
-            else
+            else if (rule.PayoutKind == PayoutKind.JackpotPercentage)
             {
                 var payoutPercent = rule.JackpotPayoutPercent;
                 ImGui.SetNextItemWidth(140);
@@ -142,6 +155,17 @@ public sealed class ConfigWindow : Window, IDisposable
                     rule.JackpotPayoutPercent = Math.Max(0, payoutPercent);
                     configuration.Save();
                 }
+            }
+            else
+            {
+                ImGui.SetNextItemWidth(300);
+                var externalPrize = rule.ExternalPrize;
+                if (ImGui.InputText("Prize name", ref externalPrize, 128))
+                {
+                    rule.ExternalPrize = externalPrize;
+                    configuration.Save();
+                }
+                ImGui.TextDisabled("Tracked in statistics without affecting the jackpot.");
             }
 
             var reroll = rule.GrantsReroll;
@@ -155,11 +179,15 @@ public sealed class ConfigWindow : Window, IDisposable
             if (ImGui.Button("Remove"))
                 removeIndex = i;
 
+            if (ImGui.CollapsingHeader("Win actions"))
+                DrawWinActions(rule);
+
             ImGui.PopID();
         }
 
         if (removeIndex >= 0)
         {
+            winningRangeInputs.Remove(configuration.WinRules[removeIndex].Id);
             configuration.WinRules.RemoveAt(removeIndex);
             configuration.Save();
         }
@@ -169,6 +197,71 @@ public sealed class ConfigWindow : Window, IDisposable
             configuration.WinRules.Add(new WinRule());
             configuration.Save();
         }
+    }
+
+    private void DrawWinActions(WinRule rule)
+    {
+        var highlight = rule.HighlightWinningRoll;
+        if (ImGui.Checkbox("Highlight winning roll", ref highlight))
+        {
+            rule.HighlightWinningRoll = highlight;
+            configuration.Save();
+        }
+
+        var sendEcho = rule.SendEcho;
+        if (ImGui.Checkbox("Send bartender echo", ref sendEcho))
+        {
+            rule.SendEcho = sendEcho;
+            configuration.Save();
+        }
+
+        if (rule.SendEcho)
+        {
+            ImGui.SetNextItemWidth(-1);
+            var echoMessage = rule.EchoMessage;
+            if (ImGui.InputText("Echo message", ref echoMessage, 450))
+            {
+                rule.EchoMessage = echoMessage;
+                configuration.Save();
+            }
+        }
+
+        ImGui.SetNextItemWidth(-1);
+        var chatMessage = rule.ChatMessage;
+        if (ImGui.InputText("Win message", ref chatMessage, 450))
+        {
+            rule.ChatMessage = chatMessage;
+            configuration.Save();
+        }
+
+        ImGui.TextDisabled("Send win message to:");
+        rule.ChatChannels ??= [];
+        var channelsChanged = false;
+        if (ImGui.BeginTable("WinChatChannels", 3, ImGuiTableFlags.SizingStretchSame))
+        {
+            foreach (var channel in Enum.GetValues<WinChatChannel>())
+            {
+                ImGui.TableNextColumn();
+                var selected = rule.ChatChannels.Contains(channel);
+                if (!ImGui.Checkbox(WinNotificationFormatter.GetChannelLabel(channel), ref selected))
+                    continue;
+
+                channelsChanged = true;
+                if (selected)
+                    rule.ChatChannels.Add(channel);
+                else
+                    rule.ChatChannels.Remove(channel);
+            }
+
+            ImGui.EndTable();
+        }
+
+        if (channelsChanged)
+            configuration.Save();
+
+        ImGui.TextDisabled(
+            "Placeholders: {player}, {roll}, {rule}, {payout}, {prize}, {award}. " +
+            "No selected channels means no public win message.");
     }
 
     private bool DrawPercentInput(string label, ref float value)

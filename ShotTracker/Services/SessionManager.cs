@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using ShotTracker.Models;
 
@@ -15,6 +16,7 @@ public sealed class SessionManager
 
     public NightSession? ActiveSession => configuration.ActiveSession;
     public PendingTrade? PendingTrade => configuration.PendingTrade;
+    public event Action<PlayerRound, RollRecord, IReadOnlyList<WinRule>>? WinRecorded;
 
     public PlayerRound? ActiveRound
     {
@@ -202,7 +204,7 @@ public sealed class SessionManager
         round.RemainingRolls--;
 
         var matches = configuration.WinRules
-            .Where(rule => rule.Enabled && rule.Number == value)
+            .Where(rule => rule.Enabled && rule.Matches(value))
             .ToList();
         var reroll = matches.Any(rule => rule.GrantsReroll);
         if (reroll)
@@ -230,6 +232,13 @@ public sealed class SessionManager
         session.EndingJackpot -= payout;
         round.TotalPayout += payout;
         session.TotalPayouts += payout;
+        var externalPrizes = matches
+            .Where(rule => rule.PayoutKind == PayoutKind.NonGilPrize)
+            .Select(rule => rule.ExternalPrize.Trim())
+            .Where(prize => prize.Length > 0)
+            .ToList();
+        round.ExternalPrizesWon += externalPrizes.Count;
+        session.ExternalPrizesAwarded += externalPrizes.Count;
         var labels = matches.Select(rule => rule.Label.Trim())
             .Where(label => label.Length > 0)
             .ToList();
@@ -237,24 +246,35 @@ public sealed class SessionManager
         if (reroll)
             outcome += " + reroll";
 
-        round.Rolls.Add(new RollRecord
+        var rollRecord = new RollRecord
         {
             Counter = round.Rolls.Count + 1,
             Value = value,
             WasManual = wasManual,
             GrantedReroll = reroll,
             Payout = payout,
+            ExternalPrizes = externalPrizes,
+            IsWin = matches.Count > 0,
+            HighlightWin = matches.Any(rule => rule.HighlightWinningRoll),
             Outcome = outcome,
-        });
+        };
+        round.Rolls.Add(rollRecord);
 
         if (round.RemainingRolls == 0)
             FinishActiveRoundInternal();
 
         configuration.Save();
-        return OperationResult.Ok(
-            payout > 0
-                ? $"{round.PlayerName} rolled {value} and won {payout:N0} gil."
-                : $"{round.PlayerName} rolled {value}: {outcome}.");
+        if (matches.Count > 0)
+            WinRecorded?.Invoke(round, rollRecord, matches);
+
+        var awards = new System.Collections.Generic.List<string>();
+        if (payout > 0)
+            awards.Add($"{payout:N0} gil");
+        awards.AddRange(externalPrizes);
+
+        return OperationResult.Ok(awards.Count > 0
+            ? $"{round.PlayerName} rolled {value} and won {string.Join(" and ", awards)}."
+            : $"{round.PlayerName} rolled {value}: {outcome}.");
     }
 
     public OperationResult FinishActiveRound()
