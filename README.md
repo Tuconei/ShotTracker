@@ -18,6 +18,9 @@ shot games in FFXIV.
 - Carries the jackpot balance between nights.
 - Shows total intake, payouts, house cut, dealer cut, and sale history.
 - Persists an active night and prior night summaries through Dalamud config.
+- Exports the complete ledger to CSV for spreadsheet review.
+- Imports and merges CSV records by stable ID for multi-bartender syncing
+  without double-counting repeated imports.
 
 ## Accounting model
 
@@ -57,6 +60,29 @@ amounts owed to each party for that night.
 5. Have that participant use `/random`. Rolls from other players are ignored.
 6. Use manual payment or roll entry only for fallback, corrections, or testing.
 7. Select **Close Night** to preserve the final ledger and cuts.
+
+## CSV export and bartender sync
+
+Expand **CSV export and sync** in the main window. The default file is placed
+in `Documents\ShotTracker`, and the path can be changed before exporting or
+importing.
+
+The CSV contains the game settings and winning rules plus typed rows for nights,
+player rounds, sales, and rolls. It can be opened directly in spreadsheet
+software for filtering or reconciliation.
+Imports merge records using stable IDs, then recalculate intake, cuts, payouts,
+remaining rolls, and the ending jackpot from the merged ledger. Importing the
+same file more than once does not duplicate records.
+
+**Clear Stored History** permanently removes closed nights after confirmation.
+It does not change the active night or current jackpot. Export first if the
+history may be needed later.
+
+For multiple bartenders, one operator should start the night and export it.
+Every other operator imports that file before recording activity, ensuring all
+copies share the same active-night ID. Bartenders can then exchange exports and
+use **Import and Merge CSV** throughout the night. The plugin rejects a CSV
+containing an unrelated active night rather than combining two pots.
 
 Trade-message verification currently targets the English FFXIV client text
 (`Name trades you 100,000 Gil.`). Other client languages should use the manual

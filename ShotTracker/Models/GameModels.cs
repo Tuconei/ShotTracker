@@ -70,6 +70,7 @@ public sealed class PlayerRound
 [Serializable]
 public sealed class SaleRecord
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
     public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.Now;
     public Guid RoundId { get; set; }
     public string PlayerName { get; set; } = string.Empty;
@@ -85,6 +86,7 @@ public sealed class SaleRecord
 [Serializable]
 public sealed class RollRecord
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
     public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.Now;
     public int Counter { get; set; }
     public int Value { get; set; }

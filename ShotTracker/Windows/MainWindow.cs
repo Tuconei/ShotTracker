@@ -5,6 +5,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using ShotTracker.Models;
+using ShotTracker.Services;
 
 namespace ShotTracker.Windows;
 
@@ -14,6 +15,7 @@ public sealed class MainWindow : Window, IDisposable
     private string participantName = string.Empty;
     private int tradeAmount;
     private int manualRoll;
+    private string csvPath = CsvSyncService.GetDefaultExportPath();
     private string status = "Start a night to begin.";
     private bool statusIsError;
 
@@ -42,6 +44,8 @@ public sealed class MainWindow : Window, IDisposable
     {
         DrawNightControls();
         ImGui.Separator();
+        DrawCsvSync();
+        ImGui.Separator();
 
         var session = plugin.Sessions.ActiveSession;
         if (session == null)
@@ -58,6 +62,70 @@ public sealed class MainWindow : Window, IDisposable
         DrawRolls(session);
         ImGui.Separator();
         DrawSales(session);
+    }
+
+    private void DrawCsvSync()
+    {
+        if (!ImGui.CollapsingHeader("CSV export and sync"))
+            return;
+
+        ImGui.TextWrapped(
+            "Export includes nights, player rounds, sales, and rolls. Import merges unseen records by ID, " +
+            "so the same file can be imported repeatedly without double-counting.");
+        ImGui.SetNextItemWidth(-1);
+        ImGui.InputText("CSV path", ref csvPath, 512);
+
+        if (ImGui.Button("Export CSV"))
+            ApplyCsv(plugin.CsvSync.Export(csvPath));
+
+        ImGui.SameLine();
+        if (ImGui.Button("Import and Merge CSV"))
+            ApplyCsv(plugin.CsvSync.Import(csvPath));
+
+        ImGui.SameLine();
+        if (ImGui.Button("New Export Path"))
+        {
+            csvPath = CsvSyncService.GetDefaultExportPath();
+            SetStatus("Generated a new timestamped CSV path.", false);
+        }
+
+        ImGui.TextDisabled(
+            "For multiple bartenders, start from the same exported active night. " +
+            "Imports from a different active-night ID are rejected.");
+
+        ImGui.Spacing();
+        ImGui.Text($"Stored closed nights: {plugin.Configuration.SessionHistory.Count}");
+        if (ImGui.Button("Clear Stored History"))
+            ImGui.OpenPopup("Clear stored history?");
+
+        DrawClearHistoryConfirmation();
+    }
+
+    private void DrawClearHistoryConfirmation()
+    {
+        if (!ImGui.BeginPopupModal(
+                "Clear stored history?",
+                ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            return;
+        }
+
+        ImGui.TextWrapped(
+            "Permanently delete all closed-night history from this plugin? " +
+            "This does not clear the active night or current jackpot.");
+        ImGui.Spacing();
+
+        if (ImGui.Button("Clear History"))
+        {
+            ApplyCsv(plugin.Sessions.ClearHistory());
+            ImGui.CloseCurrentPopup();
+        }
+
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel"))
+            ImGui.CloseCurrentPopup();
+
+        ImGui.EndPopup();
     }
 
     private void DrawNightControls()
@@ -332,6 +400,11 @@ public sealed class MainWindow : Window, IDisposable
         SetStatus(result.Message, !result.Success);
         if (result.Success)
             tradeAmount = 0;
+    }
+
+    private void ApplyCsv(OperationResult result)
+    {
+        SetStatus(result.Message, !result.Success);
     }
 
 }
