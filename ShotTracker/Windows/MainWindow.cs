@@ -124,14 +124,6 @@ public sealed class MainWindow : Window, IDisposable
                     $"Last unmatched trade: {pendingTrade.LastObservedPlayer}, {observedAmount:N0} gil");
             }
 
-            if (plugin.TradeDiagnostics.Count > 0)
-            {
-                ImGui.Spacing();
-                ImGui.Text("Trade diagnostics");
-                foreach (var diagnostic in plugin.TradeDiagnostics.Take(6))
-                    ImGui.TextWrapped(diagnostic);
-            }
-
             if (ImGui.Button("Cancel Verification"))
                 Apply(plugin.Sessions.CancelTradeVerification());
 
@@ -176,7 +168,7 @@ public sealed class MainWindow : Window, IDisposable
                 "The amount must be an exact multiple.");
 
             if (ImGui.Button("Wait for Matching Trade"))
-                ArmTradeVerification(participantName, tradeAmount);
+                Apply(plugin.Sessions.ArmTradeVerification(participantName, tradeAmount));
 
             ImGui.SameLine();
             if (ImGui.Button("Record Manually"))
@@ -195,7 +187,7 @@ public sealed class MainWindow : Window, IDisposable
         ImGui.SetNextItemWidth(180);
         ImGui.InputInt("Additional traded gil", ref tradeAmount, plugin.Configuration.ShotPrice);
         if (ImGui.Button("Wait for Additional Trade"))
-            ArmTradeVerification(round.PlayerName, tradeAmount);
+            Apply(plugin.Sessions.ArmTradeVerification(round.PlayerName, tradeAmount));
 
         ImGui.SameLine();
         if (ImGui.Button("Add Manually"))
@@ -342,10 +334,4 @@ public sealed class MainWindow : Window, IDisposable
             tradeAmount = 0;
     }
 
-    private void ArmTradeVerification(string playerName, long amount)
-    {
-        var result = plugin.Sessions.ArmTradeVerification(playerName, amount);
-        plugin.AddTradeDiagnostic(result.Message);
-        Apply(result);
-    }
 }
