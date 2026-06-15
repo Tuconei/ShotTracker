@@ -335,16 +335,16 @@ public sealed class SessionManager
 
     internal static bool NamesMatch(string expected, string actual)
     {
-        static string Normalize(string value)
-        {
-            var withoutWorld = value.Trim().Split(['@', '\uE05D'], 2)[0];
-            var parts = withoutWorld.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            return string.Join(' ', parts.Take(2));
-        }
-
-        var normalizedExpected = Normalize(expected);
-        var normalizedActual = Normalize(actual);
+        var normalizedExpected = NormalizeName(expected);
+        var normalizedActual = NormalizeName(actual);
         return string.Equals(normalizedExpected, normalizedActual, StringComparison.OrdinalIgnoreCase) ||
                normalizedActual.StartsWith(normalizedExpected + " ", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static string NormalizeName(string value)
+    {
+        var withoutWorld = value.Trim().Split(['@', '\uE05D'], 2)[0];
+        var parts = withoutWorld.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', parts.Take(2));
     }
 }
