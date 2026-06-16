@@ -15,26 +15,34 @@ public sealed class Configuration : IPluginConfiguration
     public float HousePercent { get; set; } = 40;
     public float DealerPercent { get; set; } = 10;
     public long JackpotBalance { get; set; }
-    public List<WinRule> WinRules { get; set; } =
-    [
-        new()
-        {
-            Label = "Perfect roll",
-            Number = 777,
-            PayoutKind = PayoutKind.JackpotPercentage,
-            JackpotPayoutPercent = 100,
-        },
-        new()
-        {
-            Label = "Lucky reroll",
-            Number = 7,
-            GrantsReroll = true,
-        },
-    ];
+    public List<WinRule> WinRules { get; set; } = [];
 
     public NightSession? ActiveSession { get; set; }
     public PendingTrade? PendingTrade { get; set; }
     public List<NightSession> SessionHistory { get; set; } = [];
+
+    public static Configuration CreateDefault()
+    {
+        return new Configuration
+        {
+            WinRules =
+            [
+                new()
+                {
+                    Label = "Perfect roll",
+                    Number = 777,
+                    PayoutKind = PayoutKind.JackpotPercentage,
+                    JackpotPayoutPercent = 100,
+                },
+                new()
+                {
+                    Label = "Lucky reroll",
+                    Number = 7,
+                    GrantsReroll = true,
+                },
+            ],
+        };
+    }
 
     public void Save()
     {

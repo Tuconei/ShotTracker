@@ -15,6 +15,29 @@ public sealed class Configuration
     public PendingTrade? PendingTrade { get; set; }
     public List<NightSession> SessionHistory { get; set; } = [];
 
+    public static Configuration CreateDefault()
+    {
+        return new Configuration
+        {
+            WinRules =
+            [
+                new()
+                {
+                    Label = "Perfect roll",
+                    Number = 777,
+                    PayoutKind = PayoutKind.JackpotPercentage,
+                    JackpotPayoutPercent = 100,
+                },
+                new()
+                {
+                    Label = "Lucky reroll",
+                    Number = 7,
+                    GrantsReroll = true,
+                },
+            ],
+        };
+    }
+
     public void Save()
     {
     }
