@@ -94,6 +94,35 @@ public sealed class WinRule
         RangeEnd = end == start ? null : end;
         return true;
     }
+
+    public WinActionProfile ToActionProfile() =>
+        new()
+        {
+            HighlightWinningRoll = HighlightWinningRoll,
+            SendEcho = SendEcho,
+            EchoMessage = EchoMessage,
+            ChatMessage = ChatMessage,
+            ChatChannels = [.. ChatChannels],
+        };
+
+    public void ApplyActionProfile(WinActionProfile profile)
+    {
+        HighlightWinningRoll = profile.HighlightWinningRoll;
+        SendEcho = profile.SendEcho;
+        EchoMessage = profile.EchoMessage;
+        ChatMessage = profile.ChatMessage;
+        ChatChannels = [.. profile.ChatChannels];
+    }
+}
+
+[Serializable]
+public sealed class WinActionProfile
+{
+    public bool HighlightWinningRoll { get; set; } = true;
+    public bool SendEcho { get; set; }
+    public string EchoMessage { get; set; } = "WIN: {player} rolled {roll} ({rule}) - {award}";
+    public string ChatMessage { get; set; } = "Congratulations {player}! You rolled {roll} and won {award}!";
+    public List<WinChatChannel> ChatChannels { get; set; } = [];
 }
 
 [Serializable]

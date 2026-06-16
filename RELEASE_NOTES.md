@@ -1,3 +1,23 @@
+# v0.1.8 - Reusable Win Actions
+
+ShotTracker now makes it easier to keep announcement settings consistent across
+multiple winning rules.
+
+## Added
+
+- Configure a default win-action profile for highlight, bartender echo, message
+  templates, and selected chat channels.
+- Apply the default win-action profile to every winning rule at once.
+- New winning rules inherit the default win-action profile automatically.
+- Copy and paste win actions from one winning rule to another.
+- Save an individual rule's win actions back as the new default profile.
+
+## Validation
+
+- Debug and Release builds pass against Dalamud SDK 15 with zero warnings.
+- Accounting, trade verification, CSV synchronization, winning-range,
+  win-action-profile, notification-template, and history-clearing tests pass.
+
 # v0.1.6 - Configurable Wins and Prizes
 
 ShotTracker now supports broader winning rules and customizable actions when a

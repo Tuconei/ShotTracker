@@ -6,6 +6,7 @@ RunInvalidSplitTest();
 RunTradeVerificationTest();
 RunDefaultWinRulesTest();
 RunWinningRangeTest();
+RunWinActionProfileTest();
 RunNotificationFormattingTest();
 RunNightLifecycleTest();
 RunCsvSyncTest();
@@ -345,6 +346,35 @@ static void RunWinningRangeTest()
     Assert(manager.RecordRoll("Range Player", 21).Success, "Above-range roll should be accepted.");
     Assert(configuration.ActiveSession!.TotalPayouts == 20, "Only rolls inside the range should pay.");
     Assert(winEvents == 2, "Win actions should fire only for rolls inside the range.");
+}
+
+static void RunWinActionProfileTest()
+{
+    var source = new WinRule
+    {
+        HighlightWinningRoll = false,
+        SendEcho = true,
+        EchoMessage = "Echo {player}",
+        ChatMessage = "Chat {award}",
+        ChatChannels = [WinChatChannel.Party],
+    };
+    var target = new WinRule
+    {
+        ChatChannels = [WinChatChannel.FreeCompany],
+    };
+
+    var profile = source.ToActionProfile();
+    target.ApplyActionProfile(profile);
+    profile.ChatChannels.Add(WinChatChannel.Say);
+    source.ChatChannels.Add(WinChatChannel.Yell);
+
+    Assert(!target.HighlightWinningRoll, "Applied profile should copy highlight setting.");
+    Assert(target.SendEcho, "Applied profile should copy echo setting.");
+    Assert(target.EchoMessage == "Echo {player}", "Applied profile should copy echo message.");
+    Assert(target.ChatMessage == "Chat {award}", "Applied profile should copy chat message.");
+    Assert(
+        target.ChatChannels.SequenceEqual([WinChatChannel.Party]),
+        "Applied profile should copy selected channels without sharing the list.");
 }
 
 static void RunNotificationFormattingTest()

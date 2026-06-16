@@ -12,6 +12,7 @@ public sealed class ConfigWindow : Window, IDisposable
 {
     private readonly Configuration configuration;
     private readonly Dictionary<Guid, string> winningRangeInputs = [];
+    private WinActionProfile? copiedWinActionProfile;
 
     public ConfigWindow(Plugin plugin)
         : base("ShotTracker Settings###ShotTrackerConfig")
@@ -85,6 +86,19 @@ public sealed class ConfigWindow : Window, IDisposable
         ImGui.TextDisabled("Payouts are deducted from this jackpot. Fixed and percentage payouts are capped at its balance.");
         ImGui.Separator();
         ImGui.Text("Winning numbers and ranges");
+        if (ImGui.CollapsingHeader("Default win actions"))
+        {
+            configuration.DefaultWinActionProfile ??= new WinActionProfile();
+            DrawWinActions(configuration.DefaultWinActionProfile);
+
+            if (ImGui.Button("Apply default actions to all rules"))
+            {
+                foreach (var rule in configuration.WinRules)
+                    rule.ApplyActionProfile(configuration.DefaultWinActionProfile);
+
+                configuration.Save();
+            }
+        }
 
         var removeIndex = -1;
         for (var i = 0; i < configuration.WinRules.Count; i++)
@@ -180,7 +194,10 @@ public sealed class ConfigWindow : Window, IDisposable
                 removeIndex = i;
 
             if (ImGui.CollapsingHeader("Win actions"))
+            {
+                DrawWinActionCopyControls(rule);
                 DrawWinActions(rule);
+            }
 
             ImGui.PopID();
         }
@@ -194,74 +211,145 @@ public sealed class ConfigWindow : Window, IDisposable
 
         if (ImGui.Button("Add Winning Number"))
         {
-            configuration.WinRules.Add(new WinRule());
+            var rule = new WinRule();
+            if (configuration.DefaultWinActionProfile != null)
+                rule.ApplyActionProfile(configuration.DefaultWinActionProfile);
+
+            configuration.WinRules.Add(rule);
             configuration.Save();
         }
     }
 
     private void DrawWinActions(WinRule rule)
     {
-        var highlight = rule.HighlightWinningRoll;
+        DrawWinActions(rule.ToActionProfile(), rule.ApplyActionProfile);
+    }
+
+    private void DrawWinActions(WinActionProfile profile)
+    {
+        DrawWinActions(profile, updated =>
+        {
+            profile.HighlightWinningRoll = updated.HighlightWinningRoll;
+            profile.SendEcho = updated.SendEcho;
+            profile.EchoMessage = updated.EchoMessage;
+            profile.ChatMessage = updated.ChatMessage;
+            profile.ChatChannels = [.. updated.ChatChannels];
+        });
+    }
+
+    private void DrawWinActions(WinActionProfile profile, Action<WinActionProfile> apply)
+    {
+        var updated = new WinActionProfile
+        {
+            HighlightWinningRoll = profile.HighlightWinningRoll,
+            SendEcho = profile.SendEcho,
+            EchoMessage = profile.EchoMessage,
+            ChatMessage = profile.ChatMessage,
+            ChatChannels = [.. profile.ChatChannels],
+        };
+
+        var highlight = updated.HighlightWinningRoll;
         if (ImGui.Checkbox("Highlight winning roll", ref highlight))
         {
-            rule.HighlightWinningRoll = highlight;
+            updated.HighlightWinningRoll = highlight;
+            apply(updated);
             configuration.Save();
         }
 
-        var sendEcho = rule.SendEcho;
+        var sendEcho = updated.SendEcho;
         if (ImGui.Checkbox("Send bartender echo", ref sendEcho))
         {
-            rule.SendEcho = sendEcho;
+            updated.SendEcho = sendEcho;
+            apply(updated);
             configuration.Save();
         }
 
-        if (rule.SendEcho)
+        if (updated.SendEcho)
         {
             ImGui.SetNextItemWidth(-1);
-            var echoMessage = rule.EchoMessage;
+            var echoMessage = updated.EchoMessage;
             if (ImGui.InputText("Echo message", ref echoMessage, 450))
             {
-                rule.EchoMessage = echoMessage;
+                updated.EchoMessage = echoMessage;
+                apply(updated);
                 configuration.Save();
             }
         }
 
         ImGui.SetNextItemWidth(-1);
-        var chatMessage = rule.ChatMessage;
+        var chatMessage = updated.ChatMessage;
         if (ImGui.InputText("Win message", ref chatMessage, 450))
         {
-            rule.ChatMessage = chatMessage;
+            updated.ChatMessage = chatMessage;
+            apply(updated);
             configuration.Save();
         }
 
         ImGui.TextDisabled("Send win message to:");
-        rule.ChatChannels ??= [];
+        updated.ChatChannels ??= [];
         var channelsChanged = false;
         if (ImGui.BeginTable("WinChatChannels", 3, ImGuiTableFlags.SizingStretchSame))
         {
             foreach (var channel in Enum.GetValues<WinChatChannel>())
             {
                 ImGui.TableNextColumn();
-                var selected = rule.ChatChannels.Contains(channel);
+                var selected = updated.ChatChannels.Contains(channel);
                 if (!ImGui.Checkbox(WinNotificationFormatter.GetChannelLabel(channel), ref selected))
                     continue;
 
                 channelsChanged = true;
                 if (selected)
-                    rule.ChatChannels.Add(channel);
+                    updated.ChatChannels.Add(channel);
                 else
-                    rule.ChatChannels.Remove(channel);
+                    updated.ChatChannels.Remove(channel);
             }
 
             ImGui.EndTable();
         }
 
         if (channelsChanged)
+        {
+            apply(updated);
             configuration.Save();
+        }
 
         ImGui.TextDisabled(
             "Placeholders: {player}, {roll}, {rule}, {payout}, {prize}, {award}. " +
             "No selected channels means no public win message.");
+    }
+
+    private void DrawWinActionCopyControls(WinRule rule)
+    {
+        if (ImGui.Button("Copy actions"))
+            copiedWinActionProfile = rule.ToActionProfile();
+
+        ImGui.SameLine();
+        if (copiedWinActionProfile == null)
+            ImGui.BeginDisabled();
+
+        if (ImGui.Button("Paste actions") && copiedWinActionProfile != null)
+        {
+            rule.ApplyActionProfile(copiedWinActionProfile);
+            configuration.Save();
+        }
+
+        if (copiedWinActionProfile == null)
+            ImGui.EndDisabled();
+
+        ImGui.SameLine();
+        if (ImGui.Button("Use default"))
+        {
+            configuration.DefaultWinActionProfile ??= new WinActionProfile();
+            rule.ApplyActionProfile(configuration.DefaultWinActionProfile);
+            configuration.Save();
+        }
+
+        ImGui.SameLine();
+        if (ImGui.Button("Save as default"))
+        {
+            configuration.DefaultWinActionProfile = rule.ToActionProfile();
+            configuration.Save();
+        }
     }
 
     private bool DrawPercentInput(string label, ref float value)

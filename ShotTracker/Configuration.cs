@@ -19,6 +19,7 @@ public sealed class Configuration : IPluginConfiguration
 
     public NightSession? ActiveSession { get; set; }
     public PendingTrade? PendingTrade { get; set; }
+    public WinActionProfile DefaultWinActionProfile { get; set; } = new();
     public List<NightSession> SessionHistory { get; set; } = [];
 
     public static Configuration CreateDefault()
