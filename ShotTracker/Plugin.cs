@@ -37,7 +37,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public Plugin()
     {
-        Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+        Configuration = PluginInterface.GetPluginConfig() as Configuration ?? Configuration.CreateDefault();
         Sessions = new SessionManager(Configuration);
         CsvSync = new CsvSyncService(Configuration);
         WinNotifications = new WinNotificationDispatcher();

@@ -4,6 +4,7 @@ using ShotTracker.Services;
 
 RunInvalidSplitTest();
 RunTradeVerificationTest();
+RunDefaultWinRulesTest();
 RunWinningRangeTest();
 RunNotificationFormattingTest();
 RunNightLifecycleTest();
@@ -102,6 +103,20 @@ static void RunTradeVerificationTest()
     Assert(
         !configuration.ActiveSession.Sales.Last().WasVerified,
         "Manual override should remain visibly unverified.");
+}
+
+static void RunDefaultWinRulesTest()
+{
+    Assert(
+        new Configuration().WinRules.Count == 0,
+        "Deserialized configurations must not be pre-seeded with sample rules.");
+
+    var defaults = Configuration.CreateDefault();
+    Assert(defaults.WinRules.Count == 2, "Brand new configurations should include the starter sample rules.");
+    Assert(
+        defaults.WinRules.Any(rule => rule.Label == "Perfect roll") &&
+        defaults.WinRules.Any(rule => rule.Label == "Lucky reroll"),
+        "Starter sample rules should remain available for new users.");
 }
 
 static void RunNightLifecycleTest()
