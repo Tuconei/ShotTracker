@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
 namespace ShotTracker.Models;
 
@@ -113,6 +114,26 @@ public sealed class WinRule
         ChatMessage = profile.ChatMessage;
         ChatChannels = [.. profile.ChatChannels];
     }
+
+    public WinRule Clone() =>
+        new()
+        {
+            Id = Id,
+            Label = Label,
+            Number = Number,
+            RangeEnd = RangeEnd,
+            PayoutKind = PayoutKind,
+            FixedPayoutGil = FixedPayoutGil,
+            JackpotPayoutPercent = JackpotPayoutPercent,
+            ExternalPrize = ExternalPrize,
+            GrantsReroll = GrantsReroll,
+            HighlightWinningRoll = HighlightWinningRoll,
+            SendEcho = SendEcho,
+            EchoMessage = EchoMessage,
+            ChatMessage = ChatMessage,
+            ChatChannels = [.. ChatChannels],
+            Enabled = Enabled,
+        };
 }
 
 [Serializable]
@@ -123,6 +144,44 @@ public sealed class WinActionProfile
     public string EchoMessage { get; set; } = "WIN: {player} rolled {roll} ({rule}) - {award}";
     public string ChatMessage { get; set; } = "Congratulations {player}! You rolled {roll} and won {award}!";
     public List<WinChatChannel> ChatChannels { get; set; } = [];
+
+    public WinActionProfile Clone() =>
+        new()
+        {
+            HighlightWinningRoll = HighlightWinningRoll,
+            SendEcho = SendEcho,
+            EchoMessage = EchoMessage,
+            ChatMessage = ChatMessage,
+            ChatChannels = [.. ChatChannels],
+        };
+}
+
+[Serializable]
+public sealed class VenueProfile
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = "New venue";
+    public int ShotPrice { get; set; } = 100_000;
+    public float JackpotPercent { get; set; } = 50;
+    public float HousePercent { get; set; } = 40;
+    public float DealerPercent { get; set; } = 10;
+    public long JackpotBalance { get; set; }
+    public WinActionProfile DefaultWinActionProfile { get; set; } = new();
+    public List<WinRule> WinRules { get; set; } = [];
+
+    public VenueProfile Clone() =>
+        new()
+        {
+            Id = Id,
+            Name = Name,
+            ShotPrice = ShotPrice,
+            JackpotPercent = JackpotPercent,
+            HousePercent = HousePercent,
+            DealerPercent = DealerPercent,
+            JackpotBalance = JackpotBalance,
+            DefaultWinActionProfile = DefaultWinActionProfile.Clone(),
+            WinRules = [.. WinRules.Select(rule => rule.Clone())],
+        };
 }
 
 [Serializable]

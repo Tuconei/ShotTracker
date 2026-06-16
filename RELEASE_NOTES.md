@@ -1,3 +1,24 @@
+# v0.1.9 - Venue Profiles
+
+ShotTracker now supports reusable venue profiles for bartenders who work across
+multiple venues with different game setups.
+
+## Added
+
+- Create named venue profiles from the current settings.
+- Load saved venue profiles for pricing, split percentages, jackpot balance,
+  default win actions, and winning rules.
+- Overwrite a saved venue profile from the current setup.
+- Rename or delete saved venue profiles from Settings.
+- Prevent loading a different venue profile while a night is active.
+
+## Validation
+
+- Debug and Release builds pass against Dalamud SDK 15 with zero warnings.
+- Accounting, trade verification, CSV synchronization, winning-range,
+  win-action-profile, venue-profile, notification-template, and history-clearing
+  tests pass.
+
 # v0.1.8 - Reusable Win Actions
 
 ShotTracker now makes it easier to keep announcement settings consistent across

@@ -7,6 +7,7 @@ RunTradeVerificationTest();
 RunDefaultWinRulesTest();
 RunWinningRangeTest();
 RunWinActionProfileTest();
+RunVenueProfileTest();
 RunNotificationFormattingTest();
 RunNightLifecycleTest();
 RunCsvSyncTest();
@@ -375,6 +376,65 @@ static void RunWinActionProfileTest()
     Assert(
         target.ChatChannels.SequenceEqual([WinChatChannel.Party]),
         "Applied profile should copy selected channels without sharing the list.");
+}
+
+static void RunVenueProfileTest()
+{
+    var configuration = new Configuration
+    {
+        ShotPrice = 250,
+        JackpotPercent = 55,
+        HousePercent = 35,
+        DealerPercent = 10,
+        JackpotBalance = 1_234,
+        PendingTrade = new PendingTrade(),
+        DefaultWinActionProfile = new WinActionProfile
+        {
+            SendEcho = true,
+            ChatChannels = [WinChatChannel.Party],
+        },
+        WinRules =
+        [
+            new WinRule
+            {
+                Label = "Venue A",
+                Number = 42,
+                SendEcho = true,
+                ChatChannels = [WinChatChannel.FreeCompany],
+            },
+        ],
+    };
+
+    var profile = configuration.CaptureVenueProfile(" Venue A ");
+    configuration.VenueProfiles.Add(profile);
+    configuration.ShotPrice = 100;
+    configuration.JackpotBalance = 0;
+    configuration.DefaultWinActionProfile.ChatChannels.Add(WinChatChannel.Say);
+    configuration.WinRules[0].Label = "Changed";
+    configuration.WinRules[0].ChatChannels.Add(WinChatChannel.Say);
+
+    configuration.ApplyVenueProfile(profile);
+    profile.WinRules[0].Label = "Mutated saved copy";
+    profile.DefaultWinActionProfile.ChatChannels.Add(WinChatChannel.Yell);
+
+    Assert(configuration.ShotPrice == 250, "Venue profile should restore shot price.");
+    Assert(configuration.JackpotPercent == 55, "Venue profile should restore jackpot split.");
+    Assert(configuration.JackpotBalance == 1_234, "Venue profile should restore jackpot balance.");
+    Assert(configuration.PendingTrade == null, "Loading a venue profile should clear pending trade verification.");
+    Assert(configuration.ActiveVenueProfileId == profile.Id, "Loading a venue profile should mark it active.");
+    Assert(configuration.WinRules.Single().Label == "Venue A", "Venue profile should restore win rules.");
+    Assert(
+        configuration.WinRules.Single().ChatChannels.SequenceEqual([WinChatChannel.FreeCompany]),
+        "Venue profile win rules should not share channel lists.");
+    Assert(
+        configuration.DefaultWinActionProfile.ChatChannels.SequenceEqual([WinChatChannel.Party]),
+        "Venue profile default actions should not share channel lists.");
+
+    configuration.WinRules[0].Label = "Saved update";
+    configuration.SaveVenueProfile(profile);
+    Assert(
+        configuration.VenueProfiles.Single().WinRules.Single().Label == "Saved update",
+        "Saving current settings should overwrite the selected venue profile.");
 }
 
 static void RunNotificationFormattingTest()

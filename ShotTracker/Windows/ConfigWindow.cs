@@ -13,6 +13,7 @@ public sealed class ConfigWindow : Window, IDisposable
     private readonly Configuration configuration;
     private readonly Dictionary<Guid, string> winningRangeInputs = [];
     private WinActionProfile? copiedWinActionProfile;
+    private string newVenueProfileName = "New venue";
 
     public ConfigWindow(Plugin plugin)
         : base("ShotTracker Settings###ShotTrackerConfig")
@@ -31,6 +32,9 @@ public sealed class ConfigWindow : Window, IDisposable
 
     public override void Draw()
     {
+        DrawVenueProfiles();
+        ImGui.Separator();
+
         ImGui.Text("Pricing and nightly split");
         ImGui.SetNextItemWidth(180);
         var shotPrice = configuration.ShotPrice;
@@ -216,6 +220,87 @@ public sealed class ConfigWindow : Window, IDisposable
                 rule.ApplyActionProfile(configuration.DefaultWinActionProfile);
 
             configuration.WinRules.Add(rule);
+            configuration.Save();
+        }
+    }
+
+    private void DrawVenueProfiles()
+    {
+        ImGui.Text("Venue profiles");
+        ImGui.TextDisabled("Profiles save pricing, split, jackpot, default win actions, and winning rules.");
+
+        ImGui.SetNextItemWidth(260);
+        ImGui.InputText("New profile name", ref newVenueProfileName, 64);
+        ImGui.SameLine();
+        if (ImGui.Button("Create profile"))
+        {
+            var profile = configuration.CaptureVenueProfile(newVenueProfileName);
+            configuration.VenueProfiles.Add(profile);
+            configuration.ActiveVenueProfileId = profile.Id;
+            configuration.Save();
+        }
+
+        if (configuration.VenueProfiles.Count == 0)
+        {
+            ImGui.TextDisabled("No saved profiles yet.");
+            return;
+        }
+
+        var removeIndex = -1;
+        for (var i = 0; i < configuration.VenueProfiles.Count; i++)
+        {
+            var profile = configuration.VenueProfiles[i];
+            ImGui.PushID(profile.Id.ToString());
+
+            var active = configuration.ActiveVenueProfileId == profile.Id ? "active" : "saved";
+            ImGui.Text($"{profile.Name} ({active})");
+
+            ImGui.SetNextItemWidth(220);
+            var name = profile.Name;
+            if (ImGui.InputText("Name", ref name, 64))
+            {
+                profile.Name = name.Trim().Length == 0 ? "New venue" : name.Trim();
+                configuration.Save();
+            }
+
+            var canLoad = configuration.ActiveSession == null;
+            if (!canLoad)
+                ImGui.BeginDisabled();
+
+            if (ImGui.Button("Load"))
+            {
+                configuration.ApplyVenueProfile(profile);
+                winningRangeInputs.Clear();
+                configuration.Save();
+            }
+
+            if (!canLoad)
+                ImGui.EndDisabled();
+
+            ImGui.SameLine();
+            if (ImGui.Button("Save current"))
+            {
+                configuration.SaveVenueProfile(profile);
+                configuration.Save();
+            }
+
+            ImGui.SameLine();
+            if (ImGui.Button("Delete"))
+                removeIndex = i;
+
+            ImGui.PopID();
+        }
+
+        if (configuration.ActiveSession != null)
+            ImGui.TextDisabled("Close the active night before loading a different venue profile.");
+
+        if (removeIndex >= 0)
+        {
+            var removed = configuration.VenueProfiles[removeIndex];
+            configuration.VenueProfiles.RemoveAt(removeIndex);
+            if (configuration.ActiveVenueProfileId == removed.Id)
+                configuration.ActiveVenueProfileId = null;
+
             configuration.Save();
         }
     }
