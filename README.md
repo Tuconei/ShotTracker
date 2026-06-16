@@ -27,29 +27,53 @@ Open the plugin with:
 - Supports reroll awards.
 - Highlights winning ledger rows.
 - Sends configurable bartender echoes and chat-channel win messages.
+- Reuses announcement profiles across winning rules.
+- Saves venue profiles for bartenders who work multiple events or locations.
 - Exports and imports CSV ledgers for spreadsheet review and bartender sync.
 - Saves active nights and closed-night history through Dalamud configuration.
 
 ## Main Workflow
 
 1. Open `/shottracker`.
-2. Click **Settings** and configure pricing, split percentages, jackpot, and
-   win rules.
-3. Click **Start Night**.
-4. Target the participant and click **Use Target**, or type their visible
+2. Click **Settings** and load or create a venue profile if you use multiple
+   setups.
+3. Configure pricing, split percentages, jackpot, win rules, and notification
+   actions.
+4. Click **Start Night**.
+5. Target the participant and click **Use Target**, or type their visible
    character name manually.
-5. Enter the total gil they are buying in for.
-6. Click **Wait for Matching Trade**.
-7. Complete the in-game trade or trades.
-8. Have the participant roll with `/random`.
-9. Continue until the participant has no rolls remaining, or click **End
+6. Enter the total gil they are buying in for.
+7. Click **Wait for Matching Trade**.
+8. Complete the in-game trade or trades.
+9. Have the participant roll with `/random`.
+10. Continue until the participant has no rolls remaining, or click **End
    Player**.
-10. Click **Close Night** when the event is finished.
+11. Click **Close Night** when the event is finished.
 
 Manual payment and manual roll buttons are available for corrections, testing,
 or cases where chat verification is not usable.
 
 ## Settings
+
+### Venue Profiles
+
+Venue profiles let one bartender keep separate setups for multiple venues or
+events. A profile stores:
+
+- Gil per shot.
+- Jackpot, house, and dealer split percentages.
+- Current jackpot balance.
+- Default win-action settings.
+- Winning rules, including payout types, notification templates, and selected
+  chat channels.
+
+From **Settings**, create a profile from the current setup, load a saved
+profile, overwrite a saved profile with the current setup, rename a profile, or
+delete one you no longer need.
+
+Loading a different venue profile is disabled while a night is active. Close
+the active night first so the pricing, jackpot, and win rules used for the
+ledger stay consistent.
 
 ### Pricing and Split
 
@@ -90,6 +114,9 @@ Supported payout types:
 If multiple rules match one roll, ShotTracker combines their gil payouts and
 records all matching prize names. Gil payouts are capped to the jackpot balance
 available at the time of the roll.
+
+New winning rules inherit the current default win actions, so common
+announcement behavior can be configured once and reused.
 
 ## Trade Verification
 
@@ -147,6 +174,16 @@ Each win rule can send a private bartender echo and/or public messages to
 selected chat channels. Supported channels include Say, Yell, Shout, Party,
 Alliance, Free Company, Novice Network, PvP Team, linkshells, and cross-world
 linkshells.
+
+The **Default win actions** section in Settings stores the shared notification
+profile used by newly added winning rules. You can apply the default actions to
+all existing rules at once, use the default on a single rule, or save an
+individual rule's actions as the new default.
+
+Each rule also has **Copy actions** and **Paste actions** buttons. These copy
+the rule's highlight setting, bartender echo setting, message templates, and
+selected chat channels, without changing the winning number, payout, prize, or
+reroll settings.
 
 Message templates support these placeholders:
 
