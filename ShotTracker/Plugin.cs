@@ -20,6 +20,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
     [PluginService] internal static IPlayerState PlayerState { get; private set; } = null!;
     [PluginService] internal static ITargetManager TargetManager { get; private set; } = null!;
+    [PluginService] internal static IFramework Framework { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
     private const string CommandName = "/shottracker";
@@ -40,7 +41,7 @@ public sealed class Plugin : IDalamudPlugin
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? Configuration.CreateDefault();
         Sessions = new SessionManager(Configuration);
         CsvSync = new CsvSyncService(Configuration);
-        WinNotifications = new WinNotificationDispatcher();
+        WinNotifications = new WinNotificationDispatcher(Configuration);
         ConfigWindow = new ConfigWindow(this);
         MainWindow = new MainWindow(this);
 
@@ -55,6 +56,8 @@ public sealed class Plugin : IDalamudPlugin
         ChatGui.ChatMessage += OnChatMessage;
         ChatGui.LogMessage += OnLogMessage;
         Sessions.WinRecorded += WinNotifications.Dispatch;
+        Sessions.PaidRollsExhausted += WinNotifications.DispatchPaidRollsExhausted;
+        Framework.Update += OnFrameworkUpdate;
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
@@ -69,6 +72,8 @@ public sealed class Plugin : IDalamudPlugin
         ChatGui.ChatMessage -= OnChatMessage;
         ChatGui.LogMessage -= OnLogMessage;
         Sessions.WinRecorded -= WinNotifications.Dispatch;
+        Sessions.PaidRollsExhausted -= WinNotifications.DispatchPaidRollsExhausted;
+        Framework.Update -= OnFrameworkUpdate;
         PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi -= ToggleConfigUi;
         PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
@@ -97,6 +102,11 @@ public sealed class Plugin : IDalamudPlugin
     private void OnCommand(string command, string args)
     {
         MainWindow.Toggle();
+    }
+
+    private void OnFrameworkUpdate(IFramework framework)
+    {
+        WinNotifications.FlushOne();
     }
 
     private void OnChatMessage(IHandleableChatMessage chatMessage)

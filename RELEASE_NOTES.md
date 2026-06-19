@@ -1,3 +1,36 @@
+# v0.1.10 - Exhaustion Messages and Payout Funding
+
+ShotTracker now gives bartenders clearer announcement controls and more control
+over whether fixed gil awards affect the jackpot.
+
+## Added
+
+- Configure a paid-rolls-exhausted message that can send a bartender echo and
+  selected public chat-channel messages when a participant's purchased rolls
+  reach zero.
+- Send win notifications before paid-rolls-exhausted notifications when a final
+  roll wins.
+- Queue notification commands with a short delay between sends to avoid in-game
+  chat throttling or swallowed messages.
+- Choose per fixed-gil winning rule whether the payout deducts from the jackpot
+  or is paid by the house without reducing jackpot balance.
+- Track jackpot-funded payout amounts separately in roll CSV data so synced
+  ledgers reconstruct jackpot totals correctly.
+
+## Changed
+
+- The default win actions and paid-rolls-exhausted message settings are
+  collapsible sections to keep Settings compact.
+- Fixed gil payouts still count in player and night payout totals even when
+  they are configured as house-funded.
+
+## Validation
+
+- Debug and Release builds pass against Dalamud SDK 15 with zero warnings.
+- Accounting, trade verification, CSV synchronization, winning-range,
+  house-funded fixed payout, win-action-profile, venue-profile,
+  notification-template, paid-rolls-exhausted, and history-clearing tests pass.
+
 # v0.1.9 - Venue Profiles
 
 ShotTracker now supports reusable venue profiles for bartenders who work across

@@ -30,6 +30,20 @@ public static class WinNotificationFormatter
             .Replace("{award}", award, StringComparison.OrdinalIgnoreCase));
     }
 
+    public static string FormatPaidRollsExhausted(string template, PlayerRound round)
+    {
+        return Sanitize(template
+            .Replace("{player}", round.PlayerName, StringComparison.OrdinalIgnoreCase)
+            .Replace(
+                "{rolls}",
+                round.PurchasedRolls.ToString(CultureInfo.InvariantCulture),
+                StringComparison.OrdinalIgnoreCase)
+            .Replace(
+                "{paid}",
+                round.PaidGil.ToString("N0", CultureInfo.InvariantCulture),
+                StringComparison.OrdinalIgnoreCase));
+    }
+
     public static string BuildChatCommand(WinChatChannel channel, string message)
     {
         var command = channel switch

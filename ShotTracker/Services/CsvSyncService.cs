@@ -42,6 +42,7 @@ public sealed class CsvSyncService
         "WasManual",
         "GrantedReroll",
         "Payout",
+        "JackpotPayout",
         "ExternalPrizes",
         "IsWin",
         "HighlightWin",
@@ -59,6 +60,7 @@ public sealed class CsvSyncService
         "RangeEnd",
         "PayoutKind",
         "FixedPayoutGil",
+        "FixedPayoutFromJackpot",
         "JackpotPayoutPercent",
         "ExternalPrize",
         "HighlightWinningRoll",
@@ -113,6 +115,7 @@ public sealed class CsvSyncService
                     ["RangeEnd"] = Format(rule.RangeEnd),
                     ["PayoutKind"] = rule.PayoutKind.ToString(),
                     ["FixedPayoutGil"] = Format(rule.FixedPayoutGil),
+                    ["FixedPayoutFromJackpot"] = Format(rule.FixedPayoutFromJackpot),
                     ["JackpotPayoutPercent"] = Format(rule.JackpotPayoutPercent),
                     ["ExternalPrize"] = rule.ExternalPrize,
                     ["GrantedReroll"] = Format(rule.GrantsReroll),
@@ -340,9 +343,8 @@ public sealed class CsvSyncService
         session.UnallocatedReserve = session.Sales.Sum(sale => sale.UnallocatedReserve);
         session.TotalPayouts = session.Rounds.Sum(round => round.TotalPayout);
         session.ExternalPrizesAwarded = session.Rounds.Sum(round => round.ExternalPrizesWon);
-        session.EndingJackpot = Math.Max(
-            0,
-            session.StartingJackpot + session.JackpotContributions - session.TotalPayouts);
+        var jackpotPayouts = session.Rounds.Sum(round => round.Rolls.Sum(roll => roll.JackpotPayout));
+        session.EndingJackpot = Math.Max(0, session.StartingJackpot + session.JackpotContributions - jackpotPayouts);
 
         if (session.ActiveRoundId is { } activeRoundId &&
             session.Rounds.All(round => round.Id != activeRoundId))
@@ -421,6 +423,11 @@ public sealed class CsvSyncService
                         ? payoutKind
                         : PayoutKind.FixedGil,
                     FixedPayoutGil = ParseLong(row, indexes, "FixedPayoutGil"),
+                    FixedPayoutFromJackpot = ParseBool(
+                        row,
+                        indexes,
+                        "FixedPayoutFromJackpot",
+                        defaultValue: true),
                     JackpotPayoutPercent = ParseFloat(row, indexes, "JackpotPayoutPercent"),
                     ExternalPrize = Value(row, indexes, "ExternalPrize"),
                     GrantsReroll = ParseBool(row, indexes, "GrantedReroll"),
@@ -516,6 +523,11 @@ public sealed class CsvSyncService
                         WasManual = ParseBool(row, indexes, "WasManual"),
                         GrantedReroll = ParseBool(row, indexes, "GrantedReroll"),
                         Payout = ParseLong(row, indexes, "Payout"),
+                        JackpotPayout = ParseLongOrDefault(
+                            row,
+                            indexes,
+                            "JackpotPayout",
+                            ParseLong(row, indexes, "Payout")),
                         ExternalPrizes = ParseList(row, indexes, "ExternalPrizes"),
                         IsWin = isWin,
                         HighlightWin = ParseBool(
@@ -622,6 +634,7 @@ public sealed class CsvSyncService
                     ["WasManual"] = Format(roll.WasManual),
                     ["GrantedReroll"] = Format(roll.GrantedReroll),
                     ["Payout"] = Format(roll.Payout),
+                    ["JackpotPayout"] = Format(roll.JackpotPayout),
                     ["ExternalPrizes"] = string.Join(";", roll.ExternalPrizes),
                     ["IsWin"] = Format(roll.IsWin),
                     ["HighlightWin"] = Format(roll.HighlightWin),
@@ -824,6 +837,20 @@ public sealed class CsvSyncService
         return long.TryParse(Value(row, indexes, column), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
             ? value
             : 0;
+    }
+
+    private static long ParseLongOrDefault(
+        IReadOnlyList<string> row,
+        IReadOnlyDictionary<string, int> indexes,
+        string column,
+        long defaultValue)
+    {
+        var text = Value(row, indexes, column);
+        return text.Length == 0
+            ? defaultValue
+            : long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+                ? value
+                : defaultValue;
     }
 
     private static int ParseInt(

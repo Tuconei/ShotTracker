@@ -17,6 +17,7 @@ public sealed class SessionManager
     public NightSession? ActiveSession => configuration.ActiveSession;
     public PendingTrade? PendingTrade => configuration.PendingTrade;
     public event Action<PlayerRound, RollRecord, IReadOnlyList<WinRule>>? WinRecorded;
+    public event Action<PlayerRound>? PaidRollsExhausted;
 
     public PlayerRound? ActiveRound
     {
@@ -211,25 +212,37 @@ public sealed class SessionManager
             round.RemainingRolls++;
 
         var jackpotAtRoll = configuration.JackpotBalance;
-        long requestedPayout = 0;
+        long requestedJackpotPayout = 0;
+        long houseFundedPayout = 0;
         foreach (var rule in matches)
         {
-            var requested = rule.PayoutKind switch
+            var requestedJackpot = rule.PayoutKind switch
             {
-                PayoutKind.FixedGil => rule.FixedPayoutGil,
+                PayoutKind.FixedGil when rule.FixedPayoutFromJackpot => rule.FixedPayoutGil,
                 PayoutKind.JackpotPercentage => PercentOf(jackpotAtRoll, rule.JackpotPayoutPercent),
                 _ => 0,
             };
 
-            requested = Math.Max(0, requested);
-            requestedPayout = requested > long.MaxValue - requestedPayout
+            requestedJackpot = Math.Max(0, requestedJackpot);
+            requestedJackpotPayout = requestedJackpot > long.MaxValue - requestedJackpotPayout
                 ? long.MaxValue
-                : requestedPayout + requested;
+                : requestedJackpotPayout + requestedJackpot;
+
+            if (rule.PayoutKind == PayoutKind.FixedGil && !rule.FixedPayoutFromJackpot)
+            {
+                var requestedHouse = Math.Max(0, rule.FixedPayoutGil);
+                houseFundedPayout = requestedHouse > long.MaxValue - houseFundedPayout
+                    ? long.MaxValue
+                    : houseFundedPayout + requestedHouse;
+            }
         }
 
-        var payout = Math.Min(requestedPayout, jackpotAtRoll);
-        configuration.JackpotBalance -= payout;
-        session.EndingJackpot -= payout;
+        var jackpotPayout = Math.Min(requestedJackpotPayout, jackpotAtRoll);
+        var payout = houseFundedPayout > long.MaxValue - jackpotPayout
+            ? long.MaxValue
+            : houseFundedPayout + jackpotPayout;
+        configuration.JackpotBalance -= jackpotPayout;
+        session.EndingJackpot -= jackpotPayout;
         round.TotalPayout += payout;
         session.TotalPayouts += payout;
         var externalPrizes = matches
@@ -253,6 +266,7 @@ public sealed class SessionManager
             WasManual = wasManual,
             GrantedReroll = reroll,
             Payout = payout,
+            JackpotPayout = jackpotPayout,
             ExternalPrizes = externalPrizes,
             IsWin = matches.Count > 0,
             HighlightWin = matches.Any(rule => rule.HighlightWinningRoll),
@@ -260,12 +274,17 @@ public sealed class SessionManager
         };
         round.Rolls.Add(rollRecord);
 
-        if (round.RemainingRolls == 0)
+        var paidRollsExhausted = round.RemainingRolls == 0;
+        if (paidRollsExhausted)
+        {
             FinishActiveRoundInternal();
+        }
 
         configuration.Save();
         if (matches.Count > 0)
             WinRecorded?.Invoke(round, rollRecord, matches);
+        if (paidRollsExhausted)
+            PaidRollsExhausted?.Invoke(round);
 
         var awards = new System.Collections.Generic.List<string>();
         if (payout > 0)

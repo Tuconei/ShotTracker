@@ -51,6 +51,7 @@ public sealed class WinRule
     public int? RangeEnd { get; set; }
     public PayoutKind PayoutKind { get; set; }
     public long FixedPayoutGil { get; set; }
+    public bool FixedPayoutFromJackpot { get; set; } = true;
     public float JackpotPayoutPercent { get; set; }
     public string ExternalPrize { get; set; } = string.Empty;
     public bool GrantsReroll { get; set; }
@@ -124,6 +125,7 @@ public sealed class WinRule
             RangeEnd = RangeEnd,
             PayoutKind = PayoutKind,
             FixedPayoutGil = FixedPayoutGil,
+            FixedPayoutFromJackpot = FixedPayoutFromJackpot,
             JackpotPayoutPercent = JackpotPayoutPercent,
             ExternalPrize = ExternalPrize,
             GrantsReroll = GrantsReroll,
@@ -157,6 +159,24 @@ public sealed class WinActionProfile
 }
 
 [Serializable]
+public sealed class PaidRollsExhaustedMessageProfile
+{
+    public bool SendEcho { get; set; }
+    public string EchoMessage { get; set; } = "{player} has used all {rolls} paid roll(s).";
+    public string ChatMessage { get; set; } = "{player} has used all {rolls} paid roll(s).";
+    public List<WinChatChannel> ChatChannels { get; set; } = [];
+
+    public PaidRollsExhaustedMessageProfile Clone() =>
+        new()
+        {
+            SendEcho = SendEcho,
+            EchoMessage = EchoMessage,
+            ChatMessage = ChatMessage,
+            ChatChannels = [.. ChatChannels],
+        };
+}
+
+[Serializable]
 public sealed class VenueProfile
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -167,6 +187,7 @@ public sealed class VenueProfile
     public float DealerPercent { get; set; } = 10;
     public long JackpotBalance { get; set; }
     public WinActionProfile DefaultWinActionProfile { get; set; } = new();
+    public PaidRollsExhaustedMessageProfile PaidRollsExhaustedMessageProfile { get; set; } = new();
     public List<WinRule> WinRules { get; set; } = [];
 
     public VenueProfile Clone() =>
@@ -180,6 +201,7 @@ public sealed class VenueProfile
             DealerPercent = DealerPercent,
             JackpotBalance = JackpotBalance,
             DefaultWinActionProfile = DefaultWinActionProfile.Clone(),
+            PaidRollsExhaustedMessageProfile = PaidRollsExhaustedMessageProfile.Clone(),
             WinRules = [.. WinRules.Select(rule => rule.Clone())],
         };
 }
@@ -256,6 +278,7 @@ public sealed class RollRecord
     public bool WasManual { get; set; }
     public bool GrantedReroll { get; set; }
     public long Payout { get; set; }
+    public long JackpotPayout { get; set; }
     public List<string> ExternalPrizes { get; set; } = [];
     public bool IsWin { get; set; }
     public bool HighlightWin { get; set; }

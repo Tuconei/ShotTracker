@@ -90,10 +90,18 @@ public sealed class ConfigWindow : Window, IDisposable
         ImGui.TextDisabled("Payouts are deducted from this jackpot. Fixed and percentage payouts are capped at its balance.");
         ImGui.Separator();
         ImGui.Text("Winning numbers and ranges");
+
+        ImGui.Separator();
+        if (ImGui.CollapsingHeader("Paid rolls exhausted message"))
+        {
+            configuration.PaidRollsExhaustedMessageProfile ??= new PaidRollsExhaustedMessageProfile();
+            DrawPaidRollsExhaustedMessage(configuration.PaidRollsExhaustedMessageProfile);
+        }
+
+        ImGui.Separator();
         if (ImGui.CollapsingHeader("Default win actions"))
         {
             configuration.DefaultWinActionProfile ??= new WinActionProfile();
-            DrawWinActions(configuration.DefaultWinActionProfile);
 
             if (ImGui.Button("Apply default actions to all rules"))
             {
@@ -102,6 +110,8 @@ public sealed class ConfigWindow : Window, IDisposable
 
                 configuration.Save();
             }
+
+            DrawWinActions(configuration.DefaultWinActionProfile);
         }
 
         var removeIndex = -1;
@@ -161,6 +171,13 @@ public sealed class ConfigWindow : Window, IDisposable
                 if (ImGui.InputInt("Payout gil", ref payoutGil, 10_000, 100_000))
                 {
                     rule.FixedPayoutGil = Math.Max(0, payoutGil);
+                    configuration.Save();
+                }
+
+                var fixedPayoutFromJackpot = rule.FixedPayoutFromJackpot;
+                if (ImGui.Checkbox("Deduct fixed payout from jackpot", ref fixedPayoutFromJackpot))
+                {
+                    rule.FixedPayoutFromJackpot = fixedPayoutFromJackpot;
                     configuration.Save();
                 }
             }
@@ -435,6 +452,63 @@ public sealed class ConfigWindow : Window, IDisposable
             configuration.DefaultWinActionProfile = rule.ToActionProfile();
             configuration.Save();
         }
+    }
+
+    private void DrawPaidRollsExhaustedMessage(PaidRollsExhaustedMessageProfile profile)
+    {
+        var sendEcho = profile.SendEcho;
+        if (ImGui.Checkbox("Send exhausted-rolls bartender echo", ref sendEcho))
+        {
+            profile.SendEcho = sendEcho;
+            configuration.Save();
+        }
+
+        if (profile.SendEcho)
+        {
+            ImGui.SetNextItemWidth(-1);
+            var echoMessage = profile.EchoMessage;
+            if (ImGui.InputText("Exhausted-rolls echo message", ref echoMessage, 450))
+            {
+                profile.EchoMessage = echoMessage;
+                configuration.Save();
+            }
+        }
+
+        ImGui.SetNextItemWidth(-1);
+        var chatMessage = profile.ChatMessage;
+        if (ImGui.InputText("Exhausted-rolls chat message", ref chatMessage, 450))
+        {
+            profile.ChatMessage = chatMessage;
+            configuration.Save();
+        }
+
+        ImGui.TextDisabled("Send exhausted-rolls message to:");
+        profile.ChatChannels ??= [];
+        var channelsChanged = false;
+        if (ImGui.BeginTable("PaidRollsExhaustedChatChannels", 3, ImGuiTableFlags.SizingStretchSame))
+        {
+            foreach (var channel in Enum.GetValues<WinChatChannel>())
+            {
+                ImGui.TableNextColumn();
+                var selected = profile.ChatChannels.Contains(channel);
+                if (!ImGui.Checkbox(WinNotificationFormatter.GetChannelLabel(channel), ref selected))
+                    continue;
+
+                channelsChanged = true;
+                if (selected)
+                    profile.ChatChannels.Add(channel);
+                else
+                    profile.ChatChannels.Remove(channel);
+            }
+
+            ImGui.EndTable();
+        }
+
+        if (channelsChanged)
+            configuration.Save();
+
+        ImGui.TextDisabled(
+            "Placeholders: {player}, {rolls}, {paid}. No selected channels means no public exhausted-rolls message.");
     }
 
     private bool DrawPercentInput(string label, ref float value)

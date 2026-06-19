@@ -6,9 +6,11 @@ RunInvalidSplitTest();
 RunTradeVerificationTest();
 RunDefaultWinRulesTest();
 RunWinningRangeTest();
+RunHouseFundedFixedPayoutTest();
 RunWinActionProfileTest();
 RunVenueProfileTest();
 RunNotificationFormattingTest();
+RunPaidRollsExhaustedTest();
 RunNightLifecycleTest();
 RunCsvSyncTest();
 RunClearHistoryTest();
@@ -223,6 +225,7 @@ static void RunCsvSyncTest()
                 Number = 700,
                 RangeEnd = 799,
                 FixedPayoutGil = 100,
+                FixedPayoutFromJackpot = false,
                 ExternalPrize = "Test prize",
                 SendEcho = true,
                 EchoMessage = "Echo {player}",
@@ -247,6 +250,9 @@ static void RunCsvSyncTest()
         Assert(second.ShotPrice == 250, "Import should sync the shot price.");
         Assert(second.WinRules.Single().Label == "Winner, big", "Import should sync CSV-escaped winning rules.");
         Assert(second.WinRules.Single().RangeEnd == 799, "Import should sync winning ranges.");
+        Assert(
+            !second.WinRules.Single().FixedPayoutFromJackpot,
+            "Import should sync fixed payout funding source.");
         Assert(second.WinRules.Single().SendEcho, "Import should sync echo settings.");
         Assert(
             second.WinRules.Single().ChatChannels.SequenceEqual(
@@ -349,6 +355,38 @@ static void RunWinningRangeTest()
     Assert(winEvents == 2, "Win actions should fire only for rolls inside the range.");
 }
 
+static void RunHouseFundedFixedPayoutTest()
+{
+    var configuration = new Configuration
+    {
+        JackpotBalance = 25,
+        WinRules =
+        [
+            new WinRule
+            {
+                Label = "House fixed",
+                Number = 123,
+                PayoutKind = PayoutKind.FixedGil,
+                FixedPayoutGil = 100,
+                FixedPayoutFromJackpot = false,
+            },
+        ],
+    };
+    var manager = new SessionManager(configuration);
+
+    Assert(manager.StartNight().Success, "House-funded payout night should start.");
+    Assert(manager.RecordTrade("House Player", 100).Success, "House-funded payout trade should be accepted.");
+    Assert(manager.RecordRoll("House Player", 123).Success, "House-funded payout roll should be accepted.");
+
+    var session = configuration.ActiveSession!;
+    var roll = session.Rounds.Single().Rolls.Single();
+    Assert(roll.Payout == 100, "House-funded fixed payout should pay the configured amount.");
+    Assert(roll.JackpotPayout == 0, "House-funded fixed payout should not count as jackpot payout.");
+    Assert(configuration.JackpotBalance == 75, "House-funded fixed payout should not reduce the jackpot.");
+    Assert(session.EndingJackpot == 75, "Session ending jackpot should preserve house-funded fixed payouts.");
+    Assert(session.TotalPayouts == 100, "House-funded fixed payout should still count in total payouts.");
+}
+
 static void RunWinActionProfileTest()
 {
     var source = new WinRule
@@ -393,6 +431,11 @@ static void RunVenueProfileTest()
             SendEcho = true,
             ChatChannels = [WinChatChannel.Party],
         },
+        PaidRollsExhaustedMessageProfile = new PaidRollsExhaustedMessageProfile
+        {
+            SendEcho = true,
+            ChatChannels = [WinChatChannel.Yell],
+        },
         WinRules =
         [
             new WinRule
@@ -410,12 +453,14 @@ static void RunVenueProfileTest()
     configuration.ShotPrice = 100;
     configuration.JackpotBalance = 0;
     configuration.DefaultWinActionProfile.ChatChannels.Add(WinChatChannel.Say);
+    configuration.PaidRollsExhaustedMessageProfile.ChatChannels.Add(WinChatChannel.Say);
     configuration.WinRules[0].Label = "Changed";
     configuration.WinRules[0].ChatChannels.Add(WinChatChannel.Say);
 
     configuration.ApplyVenueProfile(profile);
     profile.WinRules[0].Label = "Mutated saved copy";
     profile.DefaultWinActionProfile.ChatChannels.Add(WinChatChannel.Yell);
+    profile.PaidRollsExhaustedMessageProfile.ChatChannels.Add(WinChatChannel.Party);
 
     Assert(configuration.ShotPrice == 250, "Venue profile should restore shot price.");
     Assert(configuration.JackpotPercent == 55, "Venue profile should restore jackpot split.");
@@ -429,6 +474,9 @@ static void RunVenueProfileTest()
     Assert(
         configuration.DefaultWinActionProfile.ChatChannels.SequenceEqual([WinChatChannel.Party]),
         "Venue profile default actions should not share channel lists.");
+    Assert(
+        configuration.PaidRollsExhaustedMessageProfile.ChatChannels.SequenceEqual([WinChatChannel.Yell]),
+        "Venue profile exhausted-rolls message should not share channel lists.");
 
     configuration.WinRules[0].Label = "Saved update";
     configuration.SaveVenueProfile(profile);
@@ -462,6 +510,39 @@ static void RunNotificationFormattingTest()
     Assert(
         WinNotificationFormatter.GetChannelLabel(WinChatChannel.CrossWorldLinkshell3) == "CW Linkshell 3",
         "Cross-world linkshell label should be readable.");
+}
+
+static void RunPaidRollsExhaustedTest()
+{
+    var configuration = new Configuration
+    {
+        WinRules =
+        [
+            new WinRule { Label = "Final win", Number = 321 },
+        ],
+    };
+    var manager = new SessionManager(configuration);
+    PlayerRound? exhaustedRound = null;
+    var eventOrder = new List<string>();
+    manager.WinRecorded += (_, _, _) => eventOrder.Add("win");
+    manager.PaidRollsExhausted += round => exhaustedRound = round;
+    manager.PaidRollsExhausted += _ => eventOrder.Add("exhausted");
+
+    Assert(manager.StartNight().Success, "Exhausted-rolls test night should start.");
+    Assert(manager.RecordTrade("Tired Player", 100).Success, "One paid roll should be credited.");
+    Assert(manager.RecordRoll("Tired Player", 321).Success, "The paid roll should be recorded.");
+
+    Assert(exhaustedRound != null, "Exhausting paid rolls should raise an event.");
+    Assert(eventOrder.SequenceEqual(["win", "exhausted"]), "Final winning roll should notify win before exhausted rolls.");
+    var round = exhaustedRound!;
+    Assert(round.PlayerName == "Tired Player", "Exhausted event should include the player.");
+    Assert(round.PurchasedRolls == 1, "Exhausted event should include purchased rolls.");
+    Assert(manager.ActiveRound == null, "The round should be ended after paid rolls are exhausted.");
+
+    var message = WinNotificationFormatter.FormatPaidRollsExhausted(
+        "{player} used {rolls} roll(s) after paying {paid} gil.",
+        round);
+    Assert(message == "Tired Player used 1 roll(s) after paying 100 gil.", "Exhausted message placeholders should expand.");
 }
 
 static void Assert(bool condition, string message)

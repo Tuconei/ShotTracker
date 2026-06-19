@@ -16,6 +16,7 @@ public sealed class Configuration
     public NightSession? ActiveSession { get; set; }
     public PendingTrade? PendingTrade { get; set; }
     public WinActionProfile DefaultWinActionProfile { get; set; } = new();
+    public PaidRollsExhaustedMessageProfile PaidRollsExhaustedMessageProfile { get; set; } = new();
     public Guid? ActiveVenueProfileId { get; set; }
     public List<VenueProfile> VenueProfiles { get; set; } = [];
     public List<NightSession> SessionHistory { get; set; } = [];
@@ -58,6 +59,7 @@ public sealed class Configuration
             DealerPercent = DealerPercent,
             JackpotBalance = JackpotBalance,
             DefaultWinActionProfile = DefaultWinActionProfile.Clone(),
+            PaidRollsExhaustedMessageProfile = PaidRollsExhaustedMessageProfile.Clone(),
             WinRules = [.. WinRules.Select(rule => rule.Clone())],
         };
     }
@@ -84,6 +86,7 @@ public sealed class Configuration
         DealerPercent = Math.Max(0, copy.DealerPercent);
         JackpotBalance = Math.Max(0, copy.JackpotBalance);
         DefaultWinActionProfile = copy.DefaultWinActionProfile;
+        PaidRollsExhaustedMessageProfile = copy.PaidRollsExhaustedMessageProfile;
         WinRules = copy.WinRules;
         ActiveVenueProfileId = copy.Id;
         PendingTrade = null;

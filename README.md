@@ -23,10 +23,15 @@ Open the plugin with:
 - Supports exact winning numbers and inclusive winning ranges such as `0-99`.
 - Supports fixed gil payouts, percentage-of-jackpot payouts, and named non-gil
   prizes.
-- Caps gil payouts to the current jackpot so balances do not go negative.
+- Lets fixed gil payouts either deduct from the jackpot or be paid by the
+  house, while jackpot-percentage payouts always use the jackpot.
+- Caps jackpot-funded gil payouts to the current jackpot so balances do not go
+  negative.
 - Supports reroll awards.
 - Highlights winning ledger rows.
 - Sends configurable bartender echoes and chat-channel win messages.
+- Sends optional paid-rolls-exhausted messages when a participant's purchased
+  rolls run out.
 - Reuses announcement profiles across winning rules.
 - Saves venue profiles for bartenders who work multiple events or locations.
 - Exports and imports CSV ledgers for spreadsheet review and bartender sync.
@@ -111,9 +116,13 @@ Supported payout types:
 - **Non-gil prize**: records a named prize, such as a minion or item, without
   changing jackpot accounting.
 
+Fixed gil rules include **Deduct fixed payout from jackpot**. Leave it enabled
+for jackpot-funded fixed awards, or turn it off when the house should pay the
+fixed award without reducing the jackpot.
+
 If multiple rules match one roll, ShotTracker combines their gil payouts and
-records all matching prize names. Gil payouts are capped to the jackpot balance
-available at the time of the roll.
+records all matching prize names. Jackpot-funded gil payouts are capped to the
+jackpot balance available at the time of the roll.
 
 New winning rules inherit the current default win actions, so common
 announcement behavior can be configured once and reused.
@@ -180,6 +189,11 @@ profile used by newly added winning rules. You can apply the default actions to
 all existing rules at once, use the default on a single rule, or save an
 individual rule's actions as the new default.
 
+The **Paid rolls exhausted message** section can send a bartender echo and/or
+public chat message when a participant's paid rolls reach zero. These messages
+are sent after any win notifications from the final roll, and ShotTracker spaces
+queued notification commands to avoid in-game chat throttling.
+
 Each rule also has **Copy actions** and **Paste actions** buttons. These copy
 the rule's highlight setting, bartender echo setting, message templates, and
 selected chat channels, without changing the winning number, payout, prize, or
@@ -194,6 +208,14 @@ Message templates support these placeholders:
 {payout}  gil payout text
 {prize}   non-gil prize text
 {award}   combined payout/prize summary
+```
+
+Paid-rolls-exhausted message templates support:
+
+```text
+{player}  participant name
+{rolls}   purchased roll count
+{paid}    total paid gil
 ```
 
 Example:
@@ -256,8 +278,10 @@ When a sale is accepted:
 1. `trade amount / shot price` rolls are added to the active participant.
 2. Jackpot, house, dealer, and reserve amounts are calculated from the sale.
 3. Jackpot contribution is added to the carried jackpot.
-4. Rolls deduct winning gil payouts from the jackpot.
-5. Non-gil prizes are counted separately and do not affect the jackpot.
+4. Rolls deduct jackpot-funded gil payouts from the jackpot.
+5. Fixed gil payouts can optionally be paid by the house without reducing the
+   jackpot.
+6. Non-gil prizes are counted separately and do not affect the jackpot.
 
 House and dealer totals represent what is owed to each party for the active or
 closed night.
