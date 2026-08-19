@@ -1,6 +1,7 @@
 {
   "Author": "Tuconei",
   "Name": "ShotTracker",
+  "AssemblyVersion": "0.1.11.0",
   "Punchline": "Track and synchronize venue shots, payments, rolls, payouts, and announcements.",
   "Description": "Verifies incoming gil, tracks venue rolls and payouts, supports configurable win and exhausted-roll announcements, handles jackpot or house-funded fixed payouts, and synchronizes bartender ledgers by CSV. Open with /shottracker.",
   "ApplicableVersion": "any",

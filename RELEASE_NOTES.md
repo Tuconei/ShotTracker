@@ -1,3 +1,22 @@
+# v0.1.11 - Release Privacy Hardening
+
+ShotTracker now strips local build-machine paths from debug/build metadata used
+for releases.
+
+## Changed
+
+- Enable deterministic, path-mapped builds for the plugin and test harness.
+- Disable SourceLink and embedded untracked source publishing from local builds.
+- Include the release assembly version in the plugin manifest source.
+
+## Validation
+
+- Debug and Release builds pass against Dalamud SDK 15 with zero warnings.
+- Release package contents were verified to contain only the plugin DLL,
+  dependency manifest, and plugin manifest, with no nested zip.
+- Final DLL and package artifacts were scanned for local user, worktree,
+  SourceLink, and `C:\Users` path strings.
+
 # v0.1.10 - Exhaustion Messages and Payout Funding
 
 ShotTracker now gives bartenders clearer announcement controls and more control

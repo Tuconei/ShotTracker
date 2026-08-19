@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <Deterministic>true</Deterministic>
+    <PathMap>$(MSBuildThisFileDirectory)=/_/</PathMap>
+    <PublishRepositoryUrl>false</PublishRepositoryUrl>
+    <EmbedUntrackedSources>false</EmbedUntrackedSources>
+    <EnableSourceLink>false</EnableSourceLink>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+</Project>
